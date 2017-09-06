@@ -35,6 +35,7 @@ import org.apache.logging.log4j.Logger;
 
 import org.exist.http.servlets.Authenticator;
 import org.exist.http.servlets.BasicAuthenticator;
+import org.exist.security.SecurityManager;
 import org.exist.security.internal.web.HttpAccount;
 import org.exist.source.Source;
 import org.exist.source.DBSource;
@@ -188,21 +189,9 @@ public class XQueryURLRewrite extends HttpServlet {
             }
         }
 
-        Subject user = defaultUser;
-    	
-        Subject requestUser = HttpAccount.getUserFromServletRequest(request);
-        if (requestUser != null) {
-            user = requestUser;
-        } else {
-            // Secondly try basic authentication
-            final String auth = request.getHeader("Authorization");
-            if (auth != null) {
-                requestUser = authenticator.authenticate(request, response);
-                if (requestUser != null) {
-                    user = requestUser;
-                }
-            }
-        }
+
+        Subject user = getSubject(request, response);
+
 
         try {
             configure();
@@ -382,8 +371,26 @@ public class XQueryURLRewrite extends HttpServlet {
 
         }
     }
-    
-	private void applyViews(ModelAndView modelView, List<URLRewrite> views, HttpServletResponse response, RequestWrapper modifiedRequest,
+
+    private Subject getSubject(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Subject user = defaultUser;
+        Subject requestUser = HttpAccount.getUserFromServletRequest(request);
+        if (requestUser != null) {
+            user = requestUser;
+        } else {
+            // Secondly try basic authentication
+            final String auth = request.getHeader("Authorization");
+            if (auth != null) {
+                requestUser = authenticator.authenticate(request, response);
+                if (requestUser != null) {
+                    user = requestUser;
+                }
+            }
+        }
+        return user;
+    }
+
+    private void applyViews(ModelAndView modelView, List<URLRewrite> views, HttpServletResponse response, RequestWrapper modifiedRequest,
 			HttpServletResponse currentResponse)
 			throws IOException, ServletException {
 		int status;
@@ -659,6 +666,7 @@ public class XQueryURLRewrite extends HttpServlet {
                               URLRewrite staticRewrite, Properties outputProperties)
         throws ServletException, XPathException, PermissionDeniedException {
         // Try to find the XQuery
+
         final SourceInfo sourceInfo = getSourceInfo(broker, request, staticRewrite);
 
         if (sourceInfo == null) {
@@ -681,6 +689,35 @@ public class XQueryURLRewrite extends HttpServlet {
 		}
         // Find correct module load path
 		queryContext.setModuleLoadPath(sourceInfo.moduleLoadPath);
+
+
+        Subject subject = broker.getCurrentSubject();
+
+        String userName = subject.getName();
+
+        boolean loginRequired = true;
+        String loginUrl = "login.html";
+
+
+        if(loginRequired){
+
+            // check for user in request
+            String userParam = request.getParameter("user");
+            String passParam = request.getParameter("password");
+
+            if(userParam && passParam){
+                try {
+                    login(userParam,passParam);
+                    //set cookie
+                } catch (AuthenticationException e) {
+                    throw new PermissionDeniedException(e);
+                }
+            }else{
+                //redirect to login
+            }
+
+        }
+
         declareVariables(queryContext, sourceInfo, staticRewrite, basePath, request, response);
         if (compiled == null) {
 			try {
@@ -700,11 +737,31 @@ public class XQueryURLRewrite extends HttpServlet {
 
         try {
 			return xquery.execute(broker, compiled, null, outputProperties);
-		} finally {
+		}
+		finally {
             queryContext.runCleanupTasks();
 			xqyPool.returnCompiledXQuery(sourceInfo.source, compiled);
 		}
     }
+
+    private void login(final String user, final String pass) throws AuthenticationException {
+
+
+
+        try {
+            final SecurityManager sm = BrokerPool.getInstance().getSecurityManager();
+            final Subject subject = sm.authenticate(user, pass);
+
+            //switch the user of the current broker
+            switchUser(subject);
+
+//            context.getBroker().pushSubject(user);
+
+        } catch (EXistException e) {
+            throw new AuthenticationException(e);
+        }
+    }
+
 
     protected String adjustPathForSourceLookup(String basePath, String path) {
     	if (LOG.isTraceEnabled()) {
@@ -926,6 +983,7 @@ public class XQueryURLRewrite extends HttpServlet {
         }
         return sourceInfo;
     }
+
 
     private void declareVariables(XQueryContext context, SourceInfo sourceInfo, URLRewrite staticRewrite, String basePath,
 			RequestWrapper request, HttpServletResponse response)

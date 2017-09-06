@@ -165,7 +165,7 @@
             <AppenderRef ref="exist.xmlrpc"/>
         </Logger>
         
-        <Logger name="org.exist.http.urlrewrite" additivity="false" level="info">
+        <Logger name="org.exist.http.urlrewrite" additivity="false" level="trace">
             <!-- set to "trace" to get detailed info on URL rewriting -->
             <AppenderRef ref="exist.urlrewrite"/>
         </Logger>

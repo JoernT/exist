@@ -6,6 +6,7 @@
       <root url="file://$PROJECT_DIR$/extensions/xqdoc/lib" />
       <root url="file://$PROJECT_DIR$/extensions/webdav/lib" />
       <root url="file://$PROJECT_DIR$/extensions/modules/lib" />
+      <root url="jar://$PROJECT_DIR$/lib/extensions/exist-modules.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
