@@ -85,6 +85,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponseWrapper;
 import javax.xml.transform.OutputKeys;
 
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -189,8 +190,46 @@ public class XQueryURLRewrite extends HttpServlet {
             }
         }
 
-
         Subject user = getSubject(request, response);
+
+        // read repo.xml
+        // compare pathes -> login required true or false
+        // if guest and login required
+            // forward to login.html
+
+        if(user.getName().equals("guest")){
+            String reqUri = request.getRequestURI();
+
+            boolean loginRequired = false;
+            //todo: read repo.xml
+            if(reqUri.endsWith("restricted.html")){
+                loginRequired = true;
+            }
+            if(reqUri.matches("webcomponents")){
+                loginRequired = false;
+            }
+            if (loginRequired) {
+                String username = request.getParameter("user");
+                String pass = request.getParameter("password");
+                if (username != null){
+                    // login attempt if username is given
+                    // authenticate
+                    try {
+                        DBBroker broker = pool.get(Optional.ofNullable(user));
+                        user = login(username,pass,broker);
+                    } catch (EXistException e) {
+                        throw new ServletException(e);
+                    } catch (AuthenticationException e) {
+                        e.printStackTrace();
+                    }
+                }else{
+                    response.setContentType("text/html");
+                    RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/existdb-login/login.html");
+                    dispatcher.forward(request, response);
+                    return;
+                }
+            }
+        }
 
 
         try {
@@ -695,30 +734,7 @@ public class XQueryURLRewrite extends HttpServlet {
 
         String userName = subject.getName();
 
-        boolean loginRequired = true;
-        String loginUrl = "login.html";
-
-
-        if(loginRequired){
-
-            // check for user in request
-            String userParam = request.getParameter("user");
-            String passParam = request.getParameter("password");
-
-            if(userParam && passParam){
-                try {
-                    login(userParam,passParam);
-                    //set cookie
-                } catch (AuthenticationException e) {
-                    throw new PermissionDeniedException(e);
-                }
-            }else{
-                //redirect to login
-            }
-
-        }
-
-        declareVariables(queryContext, sourceInfo, staticRewrite, basePath, request, response);
+        declareVariables(queryContext, sourceInfo, staticRewrite, basePath, request, response, userName);
         if (compiled == null) {
 			try {
 				compiled = xquery.compile(broker, queryContext, sourceInfo.source);
@@ -737,29 +753,21 @@ public class XQueryURLRewrite extends HttpServlet {
 
         try {
 			return xquery.execute(broker, compiled, null, outputProperties);
-		}
+        }
 		finally {
             queryContext.runCleanupTasks();
 			xqyPool.returnCompiledXQuery(sourceInfo.source, compiled);
 		}
     }
 
-    private void login(final String user, final String pass) throws AuthenticationException {
 
+    private Subject login(final String user, final String pass, DBBroker broker) throws EXistException, AuthenticationException {
+        final SecurityManager sm = BrokerPool.getInstance().getSecurityManager();
+        final Subject subject = sm.authenticate(user, pass);
+        broker.pushSubject(subject);
 
-
-        try {
-            final SecurityManager sm = BrokerPool.getInstance().getSecurityManager();
-            final Subject subject = sm.authenticate(user, pass);
-
-            //switch the user of the current broker
-            switchUser(subject);
-
-//            context.getBroker().pushSubject(user);
-
-        } catch (EXistException e) {
-            throw new AuthenticationException(e);
-        }
+        //todo: set cookie
+        return subject;
     }
 
 
@@ -986,7 +994,7 @@ public class XQueryURLRewrite extends HttpServlet {
 
 
     private void declareVariables(XQueryContext context, SourceInfo sourceInfo, URLRewrite staticRewrite, String basePath,
-			RequestWrapper request, HttpServletResponse response)
+			RequestWrapper request, HttpServletResponse response, String userParam)
 			throws XPathException {
 		final HttpRequestWrapper reqw = new HttpRequestWrapper(request, "UTF-8", "UTF-8", false);
 		final HttpResponseWrapper respw = new HttpResponseWrapper(response);
@@ -1023,6 +1031,9 @@ public class XQueryURLRewrite extends HttpServlet {
         }
         context.declareVariable("exist:resource", resource);
         request.setAttribute("$exist:resource", resource);
+
+        context.declareVariable("exist:user", userParam);
+        request.setAttribute("$exist:user",userParam);
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("\nexist:path = " + path + "\nexist:resource = " + resource + "\nexist:controller = " + sourceInfo.controllerPath);

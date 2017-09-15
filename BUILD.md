@@ -27,7 +27,7 @@ In the example above, we use the SSH form of the GitHub repo URL to clone eXist.
 From here, you now have a compiled version of eXist that you may use just as you would an installed version of eXist, however it may be desirable to package this up for easy installation elsewhere. If you wish to create a simple ZIP distribution of eXist, run:
 
 ```bash
-$ ./build.sh dist-zip
+$ ./build.sh dist-zip  
 ```
 
 To build a full Installer for eXist, you'll need to have IzPack installed. Set your path to IzPack in `exist/build.properties` and run:
