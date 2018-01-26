@@ -33,6 +33,7 @@ import java.io.UnsupportedEncodingException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import org.exist.client.ResourceDescriptor;
 import org.exist.http.servlets.Authenticator;
 import org.exist.http.servlets.BasicAuthenticator;
 import org.exist.security.SecurityManager;
@@ -414,12 +415,15 @@ public class XQueryURLRewrite extends HttpServlet {
     */
     private void authenticate(HttpServletRequest request, HttpServletResponse response, Subject user) throws ServletException {
 
-        try {
+        try(final DBBroker broker = pool.get(Optional.ofNullable(user))) {
             //fetch the repo.xml for the requested app
             //which app are we doing authentication for?
             String appName = getAppNameFromRequest(request);
-            DBBroker broker = pool.get(Optional.ofNullable(user));
-            Document repoXml = broker.getXMLResource(XmldbURI.xmldbUriFor("xmldb:exist:///db/apps/" + appName + "/repo.xml"));
+
+            Document repoXml = null;
+            repoXml = broker.getXMLResource(XmldbURI.xmldbUriFor("xmldb:exist:///db/apps/" + appName + "/repo.xml"));
+//            DBBroker broker = pool.get(Optional.ofNullable(user));
+//            Document repoXml = broker.getXMLResource(XmldbURI.xmldbUriFor("xmldb:exist:///db/apps/" + appName + "/repo.xml"));
 
 
             if (hasRepoAuthentication(repoXml)) {
@@ -464,8 +468,6 @@ public class XQueryURLRewrite extends HttpServlet {
             LOG.error("Error while authenicating " + request.getRequestURI() + ": " + e.getMessage(), e);
             throw new ServletException("An error occurred while processing request to " + request.getRequestURI() + ": "
                     + e.getMessage(), e);
-
-        }finally {
 
         }
     }
