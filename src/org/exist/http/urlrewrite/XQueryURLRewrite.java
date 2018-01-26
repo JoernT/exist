@@ -81,10 +81,7 @@ import org.xmldb.api.base.Database;
 import org.xmldb.api.DatabaseManager;
 
 import javax.servlet.*;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponseWrapper;
+import javax.servlet.http.*;
 import javax.xml.transform.OutputKeys;
 
 import java.net.URISyntaxException;
@@ -193,64 +190,11 @@ public class XQueryURLRewrite extends HttpServlet {
 
         Subject user = getSubject(request, response);
 
-        // read repo.xml
-        // compare pathes -> login required true or false
-        // if guest and login required
-        // forward to login.html
+
         try {
-
-            if (user.getName().equals("guest")) {
-
-                String appName = getAppNameFromRequest(request);
-
-                DBBroker broker = pool.get(Optional.ofNullable(user));
-                Document repoXml = broker.getXMLResource(XmldbURI.xmldbUriFor("xmldb:exist:///db/apps/" + appName + "/repo.xml"));
-
-                // isAuthenticationRequest?
-                if(!isAllowed(request, repoXml)){
-                    // check for auth token
-                    // check for auth token
-                    // check for auth token
-                    // check for auth token
-
-
-
-                    // check for auth request
-                    // check for auth request
-                    // check for auth request
-
-                    String loginPage = getLoginEndpoint(repoXml,"login-endpoint"); // todo: will just return 'login.html' as default
-                    String username = request.getParameter("user");
-                    String pass = request.getParameter("password");
-                    if (username != null) {
-                        // login attempt if username is given
-                        // authenticate
-                        try {
-                            user = login(username, pass, broker);
-                        } catch (EXistException e) {
-                            throw new ServletException(e);
-                        } catch (AuthenticationException e) {
-                            //future todo: login counter?
-
-                            response.setContentType("text/html");
-                            // as this login attempt failed we append a 'failed=true' parameter to the request. This can be picked up by a client for displaying an error
-                            RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginPage + "?failed=true");
-                            dispatcher.forward(request, response);
-                            return;
-                        }
-
-                    } else {
-                        // do the login
-                        // do the login
-                        // do the login
-                        response.setContentType("text/html");
-                        RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginPage);
-                        dispatcher.forward(request, response);
-                        return;
-                    }
-                }
+            if(!tokenValid(request)){
+                authenticate(request,response,user);
             }
-
 
             configure();
             //checkCache(user);
@@ -440,6 +384,99 @@ public class XQueryURLRewrite extends HttpServlet {
         }
     }
 
+    private boolean tokenValid(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+
+        for(int i = 0; i < cookies.length; i++) {
+            Cookie cookie1 = cookies[i];
+            if (cookie1.getName().equals("RepoAuth")) {
+
+                //todo: parse token and check validity
+                if(cookie1.getValue().equals("blafoo")){
+                    return true;
+                }
+
+            }
+        }
+        return false;
+    }
+
+
+
+    /*
+    * Authenticate the given user according to configuration given in the repo.xml of the requested app.
+    *
+    * In case an <authentication> Element is found in repo.xml the requested path
+    *
+    * If no <authentication> Element is given in repo.xml this method just exists to allow backward-compatible
+    * processing.
+    *
+    */
+    private void authenticate(HttpServletRequest request, HttpServletResponse response, Subject user) throws ServletException {
+
+        try {
+            //fetch the repo.xml for the requested app
+            //which app are we doing authentication for?
+            String appName = getAppNameFromRequest(request);
+            DBBroker broker = pool.get(Optional.ofNullable(user));
+            Document repoXml = broker.getXMLResource(XmldbURI.xmldbUriFor("xmldb:exist:///db/apps/" + appName + "/repo.xml"));
+
+
+            if (hasRepoAuthentication(repoXml)) {
+                if (user.getName().equals("guest")) {
+
+                    if (!isAllowed(request, repoXml)) {
+                        String loginPage = getLoginEndpoint(repoXml, "login-endpoint"); // todo: will just return 'login.html' as default
+
+                        //try to get username
+                        String username = request.getParameter("user");
+                        String pass = request.getParameter("password");
+
+                        if (username == null) {
+                            //redirect to login endpoint
+                            response.setContentType("text/html");
+                            RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginPage);
+                            dispatcher.forward(request, response);
+                            return;
+                        } else {
+                            // login attempt if username is given
+                            try {
+                                // authenticate with eXistdb
+                                // todo: return value 'user' needed at all?
+                                user = login(username, pass, broker);
+                                setCookie(response);
+                            } catch (EXistException e) {
+                                throw new ServletException(e);
+                            } catch (AuthenticationException e) {
+                                //future todo: login counter?
+
+                                response.setContentType("text/html");
+                                // as this login attempt failed we append a 'failed=true' parameter to the request. This can be picked up by a client for displaying an error
+                                RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginPage + "?failed=true");
+                                dispatcher.forward(request, response);
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        }catch (final Throwable e) {
+            LOG.error("Error while authenicating " + request.getRequestURI() + ": " + e.getMessage(), e);
+            throw new ServletException("An error occurred while processing request to " + request.getRequestURI() + ": "
+                    + e.getMessage(), e);
+
+        }finally {
+
+        }
+    }
+
+    private boolean hasRepoAuthentication(Document repoXml) {
+        if(repoXml != null){
+            return null != DOMUtil.getChildElementByLocalName(repoXml, "authentication");
+        }
+        return false;
+    }
+
     //todo: this is fragile and must be improved - how can we determine the apps name from the request in a secure way?
     private String getAppNameFromRequest(HttpServletRequest request) {
         String s = request.getRequestURI();
@@ -463,12 +500,13 @@ public class XQueryURLRewrite extends HttpServlet {
         String requestPath = request.getRequestURI();
         if (repoXML != null) {
 
-            // check if request URI contains the apps' target path
-            String targetCol = DOMUtil.getChildElementByLocalName(repoXML, "target").getTextContent();
+//            // check if request URI contains the apps' target path
+//            String targetCol = DOMUtil.getChildElementByLocalName(repoXML, "allowed").getTextContent();
 
             // request matches the application target
             //todo: review - is this safe enough?
-            if (targetCol != null && requestPath.indexOf(targetCol) != -1) {
+//            if (targetCol != null && requestPath.indexOf(targetCol) != -1) {
+
                 Element authElem = DOMUtil.getChildElementByLocalName(repoXML, "authentication");
 
 
@@ -494,7 +532,7 @@ public class XQueryURLRewrite extends HttpServlet {
                     //todo: review - this is not ideal but if there's no authentication element we need to process 'old-style'
                     return true;
                 }
-            }
+//            }
         }
         return false; //todo: problem here as this makes the 'old-style' processing impossible
     }
@@ -859,16 +897,17 @@ public class XQueryURLRewrite extends HttpServlet {
         final SecurityManager sm = BrokerPool.getInstance().getSecurityManager();
         final Subject subject = sm.authenticate(user, pass);
         broker.pushSubject(subject);
-
-        //todo: set cookie
-        setCookie();
         return subject;
     }
 
-    private void setCookie() {
+    private void setCookie(HttpServletResponse response) {
         //// TODO: create token
-        String token="foobar";
-        //todo: write to cookie
+        // username + expiry date
+        String token = "blafoo";
+
+
+        Cookie cookie1 = new Cookie("RepoAuth", token);
+        response.addCookie(cookie1);
     }
 
 
