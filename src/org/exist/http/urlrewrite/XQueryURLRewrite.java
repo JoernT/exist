@@ -33,7 +33,6 @@ import java.io.UnsupportedEncodingException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import org.exist.client.ResourceDescriptor;
 import org.exist.http.servlets.Authenticator;
 import org.exist.http.servlets.BasicAuthenticator;
 import org.exist.security.SecurityManager;
@@ -99,17 +98,17 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /**
  * A servlet to redirect HTTP requests. Similar to the popular UrlRewriteFilter, but
  * based on XQuery.
- *
+ * <p>
  * The request is passed to an XQuery whose return value determines where the request will be
  * redirected to. An empty return value means the request will be passed through the filter
  * untouched. Otherwise, the query should return a single XML element, which will instruct the filter
  * how to further process the request. Details about the format can be found in the main documentation.
- *
+ * <p>
  * The request is forwarded via {@link javax.servlet.RequestDispatcher#forward(javax.servlet.ServletRequest, javax.servlet.ServletResponse)}.
  * Contrary to HTTP forwarding, there is no additional roundtrip to the client. It all happens on
  * the server. The client will not notice the redirect.
- *
- * Please read the <a href="http://exist-db.org/urlrewrite.html">documentation</a> for further information. 
+ * <p>
+ * Please read the <a href="http://exist-db.org/urlrewrite.html">documentation</a> for further information.
  */
 public class XQueryURLRewrite extends HttpServlet {
 
@@ -157,9 +156,10 @@ public class XQueryURLRewrite extends HttpServlet {
 //            checkModified = opt != null && opt.equalsIgnoreCase("true");
 
         final String opt = filterConfig.getInitParameter("compiled-cache");
-        if (opt != null)
-        	{compiledCache = opt != null && opt.equalsIgnoreCase("true");}
-        
+        if (opt != null) {
+            compiledCache = opt != null && opt.equalsIgnoreCase("true");
+        }
+
     }
 
     @Override
@@ -177,8 +177,7 @@ public class XQueryURLRewrite extends HttpServlet {
             LOG.trace(request.getRequestURI());
         }
         final Descriptor descriptor = Descriptor.getDescriptorSingleton();
-        if(descriptor != null && descriptor.requestsFiltered())
-        {
+        if (descriptor != null && descriptor.requestsFiltered()) {
             final String attr = (String) request.getAttribute("XQueryURLRewrite.forwarded");
             if (attr == null) {
 //                request = new HttpServletRequestWrapper(request, /*formEncoding*/ "utf-8" );
@@ -191,11 +190,10 @@ public class XQueryURLRewrite extends HttpServlet {
 
         Subject user = getSubject(request, response);
 
-
         try {
-            if(!tokenValid(request)){
-                authenticate(request,response,user);
-            }
+//            if (!authTokenValid(request)) {
+            checkAuthentication(request, response, user);
+//            }
 
             configure();
             //checkCache(user);
@@ -385,15 +383,15 @@ public class XQueryURLRewrite extends HttpServlet {
         }
     }
 
-    private boolean tokenValid(HttpServletRequest request) {
+    private boolean isTokenValid(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
 
-        for(int i = 0; i < cookies.length; i++) {
+        for (int i = 0; i < cookies.length; i++) {
             Cookie cookie1 = cookies[i];
             if (cookie1.getName().equals("RepoAuth")) {
 
                 //todo: parse token and check validity
-                if(cookie1.getValue().equals("blafoo")){
+                if (cookie1.getValue().equals("blafoo")) {
                     return true;
                 }
 
@@ -401,7 +399,6 @@ public class XQueryURLRewrite extends HttpServlet {
         }
         return false;
     }
-
 
 
     /*
@@ -413,67 +410,79 @@ public class XQueryURLRewrite extends HttpServlet {
     * processing.
     *
     */
-    private void authenticate(HttpServletRequest request, HttpServletResponse response, Subject user) throws ServletException {
+    private void checkAuthentication(HttpServletRequest request, HttpServletResponse response, Subject user) throws ServletException {
 
-        try(final DBBroker broker = pool.get(Optional.ofNullable(user))) {
-            //fetch the repo.xml for the requested app
-            //which app are we doing authentication for?
-            String appName = getAppNameFromRequest(request);
+        try (final DBBroker broker = pool.get(Optional.ofNullable(user))) {
 
-            Document repoXml = null;
-            repoXml = broker.getXMLResource(XmldbURI.xmldbUriFor("xmldb:exist:///db/apps/" + appName + "/repo.xml"));
-//            DBBroker broker = pool.get(Optional.ofNullable(user));
-//            Document repoXml = broker.getXMLResource(XmldbURI.xmldbUriFor("xmldb:exist:///db/apps/" + appName + "/repo.xml"));
+            if (user.getName().equals("guest")) {
 
-
-            if (hasRepoAuthentication(repoXml)) {
-                if (user.getName().equals("guest")) {
-
-                    if (!isAllowed(request, repoXml)) {
-                        String loginPage = getLoginEndpoint(repoXml, "login-endpoint"); // todo: will just return 'login.html' as default
-
-                        //try to get username
-                        String username = request.getParameter("user");
-                        String pass = request.getParameter("password");
-
-                        if (username == null) {
-                            //redirect to login endpoint
-                            response.setContentType("text/html");
-                            RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginPage);
-                            dispatcher.forward(request, response);
-                            return;
-                        } else {
-                            // login attempt if username is given
-                            try {
-                                // authenticate with eXistdb
-                                // todo: return value 'user' needed at all?
-                                user = login(username, pass, broker);
-                                setCookie(response);
-                            } catch (EXistException e) {
-                                throw new ServletException(e);
-                            } catch (AuthenticationException e) {
-                                //future todo: login counter?
-
-                                response.setContentType("text/html");
-                                // as this login attempt failed we append a 'failed=true' parameter to the request. This can be picked up by a client for displaying an error
-                                RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginPage + "?failed=true");
-                                dispatcher.forward(request, response);
-                                return;
-                            }
-                        }
-                    }
+                if (isProtected(request, user, broker)) {
+                    //login
+                    performLogin(request, response, broker);
+                }
+            } else {
+                if (!isTokenValid(request)) {
+                    performLogin(request, response, broker);
                 }
             }
-        }catch (final Throwable e) {
-            LOG.error("Error while authenicating " + request.getRequestURI() + ": " + e.getMessage(), e);
+
+        } catch (final Throwable e) {
+            LOG.error("Error while getting broker " + request.getRequestURI() + ": " + e.getMessage(), e);
             throw new ServletException("An error occurred while processing request to " + request.getRequestURI() + ": "
                     + e.getMessage(), e);
 
         }
+
+        return;//default processing
     }
 
-    private boolean hasRepoAuthentication(Document repoXml) {
-        if(repoXml != null){
+    private void performLogin(HttpServletRequest request, HttpServletResponse response, DBBroker broker) throws ServletException, IOException {
+        String appName = getAppNameFromRequest(request);
+        String loginPage = getLoginEndpoint(); // todo: will just return 'login.html' as default
+
+        //try to get username
+        String username = request.getParameter("user");
+        String pass = request.getParameter("password");
+
+        if (username == null) {
+            //redirect to login endpoint
+            response.setContentType("text/html");
+            RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginPage);
+            dispatcher.forward(request, response);
+            return;
+        } else {
+            // login attempt if username is given
+            try {
+                // checkAuthentication with eXistdb
+                // todo: return value 'user' needed at all?
+                login(username, pass, broker);
+                setCookie(response);
+            } catch (EXistException e) {
+                throw new ServletException(e);
+            } catch (AuthenticationException e) {
+                //future todo: login counter?
+
+                //todo: read config for failed page URL and forward to it
+                String loginFailedUrl = getLoginFailed(); // todo: will just return 'login.html' as default
+
+                response.setContentType("text/html");
+                // as this login attempt failed we append a 'failed=true' parameter to the request. This can be picked up by a client for displaying an error
+                RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginFailedUrl);
+                dispatcher.forward(request, response);
+                return;
+            }
+        }
+
+    }
+
+
+    private String getLoginFailed() {
+        //todo fetch from Cache
+        return "login.html?failed=true";
+    }
+
+    private boolean usesRepoAuth(Document repoXml) {
+        if (repoXml != null) {
             return null != DOMUtil.getChildElementByLocalName(repoXml, "authentication");
         }
         return false;
@@ -483,60 +492,116 @@ public class XQueryURLRewrite extends HttpServlet {
     private String getAppNameFromRequest(HttpServletRequest request) {
         String s = request.getRequestURI();
         String[] tokens = s.split("/");
-        if(tokens.length > 2) {
+        if (tokens.length > 2) {
             return tokens[3];
-        }else{
+        } else {
             return null;
         }
     }
 
     // todo: properly implement this - just a default for now
-    private String getLoginEndpoint(Document repoXml, String localname){
+    private String getLoginEndpoint() {
+        //todo: fetch from RepoURLCache
         return "login.html";
     }
 
     // todo: cache uris: key=app-name, values = list of uris
-    //todo: singleton needed for storing uris
-    private boolean isAllowed(HttpServletRequest request, Document repoXML) throws EXistException, URISyntaxException, PermissionDeniedException {
+    private boolean isProtected(HttpServletRequest request, Subject user, DBBroker broker) throws ServletException, URISyntaxException, PermissionDeniedException {
+        String appName = getAppNameFromRequest(request);
+
+
+        List allowedForApp = RepoAuthCache.getInstance().getWhiteList(appName);
+        if (allowedForApp == null || allowedForApp.size() == 0) {
+            Document repoXml = null;
+            repoXml = broker.getXMLResource(XmldbURI.xmldbUriFor("xmldb:exist:///db/apps/" + appName + "/repo.xml"));
+
+            if (repoXml != null) {
+
+                // ### try to get list of whitelisted urls from cache
+                Element authElem = DOMUtil.getChildElementByLocalName(repoXml, "authentication");
+                if (authElem != null) {
+                    LOG.debug("login-required element: ", authElem.getNodeName());
+                    List allowed = new ArrayList();
+                    Element allowedElem = DOMUtil.getChildElementByLocalName(authElem, "allowed");
+                    if (allowedElem != null) {
+                        //get uri elements and iterate them
+                        List<Element> list = DOMUtil.getChildElements(allowedElem);
+                        for (int i = 0; i < list.size(); i++) {
+                            Element element = list.get(i);
+                            if (element.getLocalName().equals("uri")) {
+                                String uriString = element.getTextContent();
+                                allowed.add(uriString);
+/*
+                                if (requestPath.indexOf(uriString) != -1) {
+                                    return true;
+                                }
+*/
+                            }
+                        }
+                        RepoAuthCache.getInstance().setWhiteList(appName, allowed);
+//                            return checkAllowed(allowed);
+                    }
+                }
+
+                // if no whitelist entry is found in the loop above
+                return false;
+            }
+
+
+        }
+
+        return checkAllowed(RepoAuthCache.getInstance().getWhiteList(appName));
+
+//        return false;
+    }
+
+    private boolean isAllowed(HttpServletRequest request, Document repoXML, String appName) throws EXistException, URISyntaxException, PermissionDeniedException {
 
         String requestPath = request.getRequestURI();
         if (repoXML != null) {
 
-//            // check if request URI contains the apps' target path
-//            String targetCol = DOMUtil.getChildElementByLocalName(repoXML, "allowed").getTextContent();
-
-            // request matches the application target
-            //todo: review - is this safe enough?
-//            if (targetCol != null && requestPath.indexOf(targetCol) != -1) {
-
+            // ### try to get list of whitelisted urls from cache
+            List allowedForApp = RepoAuthCache.getInstance().getWhiteList(appName);
+            if (allowedForApp != null && allowedForApp.size() != 0) {
+                return checkAllowed(allowedForApp);
+            } else {
                 Element authElem = DOMUtil.getChildElementByLocalName(repoXML, "authentication");
-
-
                 if (authElem != null) {
                     LOG.debug("login-required element: ", authElem.getNodeName());
-
-                    Element allowedElem = DOMUtil.getChildElementByLocalName(authElem,"allowed");
-                    if(allowedElem != null) {
+                    List allowed = new ArrayList();
+                    Element allowedElem = DOMUtil.getChildElementByLocalName(authElem, "allowed");
+                    if (allowedElem != null) {
                         //get uri elements and iterate them
-                        // todo: add a singleton cache for pathes
                         List<Element> list = DOMUtil.getChildElements(allowedElem);
                         for (int i = 0; i < list.size(); i++) {
                             Element element = list.get(i);
-                            if(element.getLocalName().equals("uri")){
+                            if (element.getLocalName().equals("uri")) {
                                 String uriString = element.getTextContent();
+                                allowed.add(uriString);
+/*
                                 if (requestPath.indexOf(uriString) != -1) {
                                     return true;
                                 }
+*/
                             }
                         }
+                        return checkAllowed(allowed);
                     }
-                } else{
-                    //todo: review - this is not ideal but if there's no authentication element we need to process 'old-style'
+                } else {
+                    // ### if there's no authentication element we need to continue 'old-style'
                     return true;
                 }
-//            }
+            }
+
+            // if no whitelist entry is found in the loop above
+            return false;
         }
-        return false; //todo: problem here as this makes the 'old-style' processing impossible
+        return true;
+    }
+
+    private boolean checkAllowed(List allowedForApp) {
+        //todo
+        return true;
     }
 
     private Subject getSubject(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -649,7 +714,7 @@ public class XQueryURLRewrite extends HttpServlet {
 
     private ModelAndView getFromCache(String url, Subject user) throws EXistException, ServletException, PermissionDeniedException {
         /* Make sure we have a broker *before* we synchronize on urlCache or we may run
-		 * into a deadlock situation (with method checkCache)
+         * into a deadlock situation (with method checkCache)
 		 */
         final ModelAndView model = urlCache.get(url);
         if (model == null) {
