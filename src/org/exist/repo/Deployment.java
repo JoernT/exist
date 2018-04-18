@@ -451,6 +451,7 @@ public class Deployment {
                     runQuery(targetCollection, packageDir, postSetupPath.get(), false);
                 }
 
+                // todo: read auth section if present and add to cache
                 storeRepoXML(repoXML, targetCollection, requestedPerms);
 
                 // TODO: it should be safe to clean up the file system after a package
@@ -586,6 +587,7 @@ public class Deployment {
                     broker.removeCollection(transaction, collection);
                 }
             }
+            //todo: remove AppAuth entry from RepoAuthCache
             mgr.commit(transaction);
         } catch (final Exception e) {
             LOG.error("Exception occurred while removing package.", e);

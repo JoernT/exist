@@ -20,12 +20,14 @@
 
 package org.exist.http.urlrewrite;
 
+import org.eclipse.jetty.deploy.App;
+
 import java.util.HashMap;
 import java.util.List;
 
 class RepoAuthCache {
     private static RepoAuthCache instance = null;
-    private static final HashMap apps = new HashMap();
+    private static final HashMap<String, AppAuth> apps = new HashMap();
 
 
     protected RepoAuthCache() {
@@ -42,12 +44,28 @@ class RepoAuthCache {
         return instance;
     }
 
-    public static List getWhiteList(String appKey){
+    public static List getAppList(String appKey){
         return (List) RepoAuthCache.apps.get(appKey);
     }
 
-    public static void setWhiteList(String appKey, List urls){
-        RepoAuthCache.apps.put(appKey,urls);
+    public static void setAuthInfo(String appKey, AppAuth auth){
+        RepoAuthCache.apps.put(appKey,auth);
     }
+
+    public static AppAuth getAuthInfo(String appKey){
+        AppAuth auth = RepoAuthCache.apps.get(appKey);
+        if(auth == null){
+
+        }
+        return auth;
+    }
+
+    public static void removeApp(String appKey){
+        if(RepoAuthCache.apps.containsKey(appKey)){
+            RepoAuthCache.apps.remove(appKey);
+        }
+    }
+
+
 
 }
