@@ -588,6 +588,7 @@ public class Deployment {
                 }
             }
             //todo: remove AppAuth entry from RepoAuthCache
+
             mgr.commit(transaction);
         } catch (final Exception e) {
             LOG.error("Exception occurred while removing package.", e);

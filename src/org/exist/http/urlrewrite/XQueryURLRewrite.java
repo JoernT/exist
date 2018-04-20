@@ -192,10 +192,13 @@ public class XQueryURLRewrite extends HttpServlet {
 
         try {
             // checkAuthentication will return without effect if there's no authentication config in repo.xml
+            user = checkAuthentication(request, response, user);
+/*
             Subject newUser = checkAuthentication(request, response, user);
             if(newUser != null){
                 user = newUser;
             }
+*/
 
             configure();
             //checkCache(user);
@@ -419,10 +422,29 @@ public class XQueryURLRewrite extends HttpServlet {
     private Subject checkAuthentication(HttpServletRequest request, HttpServletResponse response, Subject user) throws ServletException {
 
         try (final DBBroker broker = pool.get(Optional.ofNullable(user))) {
+            String appName = getAppNameFromRequest(request);
+            String requestPath = request.getRequestURI();
+
+            AppAuth auth = RepoAuthCache.getInstance().getAuthInfo(appName);
+            if(auth == null){
+                //try to get repo.xml
+                auth = initAppAuth(broker, appName);
+                //if there's none just return
+                if(auth == null) return user;
+            }
+
+            String logout = auth.getLogoutEndpoint();
+            String logoutUrl = requestPath + "?" + request.getQueryString();
+            if(logoutUrl.indexOf(logout) != -1){
+                response.setContentType("text/html");
+                RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + logout);
+                dispatcher.forward(request, response);
+            }
 
             if (user.getName().equals("guest")) {
 
-                if (isProtected(request, user, broker)) {
+//                if (isProtected(request, user, broker)) {
+                if (isProtected(auth, requestPath)) {
                     //login
                     return performLogin(request, response, broker);
                 }
@@ -439,7 +461,7 @@ public class XQueryURLRewrite extends HttpServlet {
 
         }
 
-        return null;//default processing
+        return user;//default to returning the user that was passed in
     }
 
     private Subject performLogin(HttpServletRequest request, HttpServletResponse response, DBBroker broker) throws ServletException, IOException {
@@ -472,12 +494,11 @@ public class XQueryURLRewrite extends HttpServlet {
             } catch (AuthenticationException e) {
                 //future todo: login counter?
 
-                //todo: read config for failed page URL and forward to it
-                String loginFailedUrl = getLoginFailed(); // todo: will just return 'login.html' as default
-
+                String loginFailed = RepoAuthCache.getInstance().getAuthInfo(appName).getLoginFailed();
                 response.setContentType("text/html");
                 // as this login attempt failed we append a 'failed=true' parameter to the request. This can be picked up by a client for displaying an error
-                RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginFailedUrl);
+//                RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginFailedUrl);
+                RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginFailed);
                 dispatcher.forward(request, response);
                 return null;
             }
@@ -485,11 +506,6 @@ public class XQueryURLRewrite extends HttpServlet {
 
     }
 
-
-    private String getLoginFailed() {
-        //todo fetch from Cache
-        return "login.html?failed=true";
-    }
 
     private boolean usesRepoAuth(Document repoXml) {
         if (repoXml != null) {
@@ -516,8 +532,10 @@ public class XQueryURLRewrite extends HttpServlet {
     }
 
     // todo: cache uris: key=app-name, values = list of uris
-    private boolean isProtected(HttpServletRequest request, Subject user, DBBroker broker) throws ServletException, URISyntaxException, PermissionDeniedException {
+//    private boolean isProtected(HttpServletRequest request, Subject user, DBBroker broker) throws ServletException, URISyntaxException, PermissionDeniedException {
+    private boolean isProtected(AppAuth auth, String requestPath) throws ServletException, URISyntaxException, PermissionDeniedException {
 
+/*
         String appName = getAppNameFromRequest(request);
         String requestPath = request.getRequestURI();
 
@@ -526,6 +544,7 @@ public class XQueryURLRewrite extends HttpServlet {
             //try to get repo.xml
             auth = initAppAuth(broker, appName);
         }
+*/
 
 
 
