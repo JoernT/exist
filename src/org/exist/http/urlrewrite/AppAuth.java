@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Formatter;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -37,102 +38,117 @@ public class AppAuth {
     private final String HMAC_KEY = "foobar";
     private final String HMAC_ALG = "HmacSHA256";
     private final String TOKEN_SEPARATOR = "|";
-    private final int    TOKEN_LIFETIME  = 300;  // 5min
+    private final int TOKEN_LIFETIME = 300;  // 5min
+    private final String DEFAULT_COOKIE_NAME = "AppAuth";
 
     private String loginEndpoint;
     private String logoutEndpoint;
     private String loginFailed;
     private List urls = new ArrayList();
+    private String userName = null;
 
-    public AppAuth(){
+    public AppAuth() {
         loginEndpoint = null;
     }
 
-    public String getLoginEndpoint(){
+    public String getLoginEndpoint() {
         return this.loginEndpoint;
     }
 
-    public void setLoginEndpoint(String endPoint){
+    public void setLoginEndpoint(String endPoint) {
         this.loginEndpoint = endPoint;
-        if(!this.urls.contains(endPoint)){
+        if (!this.urls.contains(endPoint)) {
             this.urls.add(endPoint);
         }
     }
 
-    public String getLogoutEndpoint(){
+    public String getLogoutEndpoint() {
         return this.logoutEndpoint;
     }
 
-    public void setLogoutEndpoint(String endPoint){
-        this.logoutEndpoint= endPoint;
-        if(!this.urls.contains(endPoint)){
+    public void setLogoutEndpoint(String endPoint) {
+        this.logoutEndpoint = endPoint;
+        if (!this.urls.contains(endPoint)) {
             this.urls.add(endPoint);
         }
     }
 
-    public String getLoginFailed(){
+    public String getLoginFailed() {
         return this.loginFailed;
     }
 
-    public void setLoginFailed(String loginFailed){
-        this.loginFailed=loginFailed;
-        if(this.urls.contains(loginFailed)){
+    public void setLoginFailed(String loginFailed) {
+        this.loginFailed = loginFailed;
+        if (this.urls.contains(loginFailed)) {
             this.urls.add(loginFailed);
         }
     }
-    public void setUrls(List urls){
-        this.urls=urls;
+
+    public void setUrls(List urls) {
+        this.urls = urls;
     }
 
-    public List getWhiteList(){
+    public List getWhiteList() {
         return this.urls;
     }
 
     public String createToken(String username) {
-	long expires = Instant.now().getEpochSecond() + TOKEN_LIFETIME;
-	try {
-	    String hmac = calcHMAC(username, expires);
-	} catch (Exception e) {
-	    e.printStackTrace();
-	}
-	return username + TOKEN_SEPARATOR + expires + TOKEN_SEPARATOR + hmac;
+        long expires = Instant.now().getEpochSecond() + TOKEN_LIFETIME;
+        try {
+            String hmac = calcHMAC(username, Long.toString(expires));
+            return username + TOKEN_SEPARATOR + expires + TOKEN_SEPARATOR + hmac;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
-    public bool validateToken(String token) {
-	try {
-	    String[] fields = token.split(Pattern.quote(TOKEN_SEPARATOR));
-	    String hmac = calcHMAC(fields[0], fields[1]);
-	} catch (PatternSyntaxException | Exception e) {
-	    e.printStackTrace();
-	}
-	long now = Instant.now().getEpochSecond();
-	if (hmac == fields[2] && now <= fields[1]) {
-	    return true;
-	} else {
-	    return fals;
-	}
+    public String getUserName() {
+        return userName;
     }
 
-    private static String calcHMAC(String username, int tstamp) throws UnsupportedEncodingException, NoSuchAlgorithmException, InvalidKeyException {
-	String tokdata = username + TOKEN_SEPARATOR + tstamp;
+    public boolean validateToken(String token) {
+        String hmac = null;
+        String[] fields = new String[3];
+        try {
+            fields = token.split(Pattern.quote(TOKEN_SEPARATOR));
+            hmac = calcHMAC(fields[0], fields[1]);
+        } catch (PatternSyntaxException |  UnsupportedEncodingException | NoSuchAlgorithmException| InvalidKeyException e) {
+            e.printStackTrace();
+        }
+        long now = Instant.now().getEpochSecond();
+        long l = Long.parseLong(fields[1]);
+        if (hmac.equals(fields[2]) && now <= l) {
+            this.userName = fields[0];
+            return true;
+        } else {
+            return false;
+        }
+    }
 
-	try {
-	    Mac hmac = Mac.getInstance(HMAC_ALG);
-	    byte[] byteKey = HMAC_KEY.getBytes("ASCII");
-	    SecretKeySpec keySpec = new SecretKeySpec(byteKey, hmac);
-	    hmac.init(keySpec);
-	    byte[] hmac_data = hmac.doFinal(tokdata.getBytes("UTF-8"));
-	} catch (UnsupportedEncodingException | NoSuchAlgorithmException |
-		 InvalidKeyException e) {
-	    throw e;
-	}
+    private String calcHMAC(String username, String tstamp) throws UnsupportedEncodingException, NoSuchAlgorithmException, InvalidKeyException {
+        String tokdata = username + TOKEN_SEPARATOR + tstamp;
 
-	Formatter formatter = new Formatter();
-	for (byte b : hmac_data) {
-	    formatter.format("%02x", b);
-	}
-	return formatter.toString();
+        try {
+            Mac hmac = Mac.getInstance(HMAC_ALG);
+            byte[] byteKey = HMAC_KEY.getBytes("ASCII");
+            SecretKeySpec keySpec = new SecretKeySpec(byteKey, HMAC_ALG);
+            hmac.init(keySpec);
+            byte[] hmac_data = hmac.doFinal(tokdata.getBytes("UTF-8"));
+            Formatter formatter = new Formatter();
+            for (byte b : hmac_data) {
+                formatter.format("%02x", b);
+            }
+            return formatter.toString();
+        } catch (UnsupportedEncodingException | NoSuchAlgorithmException |
+                InvalidKeyException e) {
+            throw e;
+        }
+
     }
 
 
+    public String getCookieName() {
+        return DEFAULT_COOKIE_NAME;
+    }
 }
