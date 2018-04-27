@@ -395,17 +395,28 @@ public class XQueryURLRewrite extends HttpServlet {
         }
     }
 
-    private boolean isTokenValid(HttpServletRequest request,AppAuth auth) {
-        Cookie[] cookies = request.getCookies();
-        String cookieName = auth.getCookieName();
+    private Subject isTokenValid(HttpServletRequest request, DBBroker broker) throws EXistException, AuthenticationException {
+        UserAuth userAuth = UserAuth.getInstance();
 
+        Cookie[] cookies = request.getCookies();
+        String cookieName = userAuth.getCookieName();
+
+        String username=null;
         for (int i = 0; i < cookies.length; i++) {
             Cookie cookie1 = cookies[i];
             if (cookie1.getName().equals(cookieName)) {
-                return auth.validateToken(cookie1.getValue());
+                username =  userAuth.validateToken(cookie1.getValue());
             }
         }
-        return false;
+
+        if (username != null){
+            LoginDetails details = UserAuth.getInstance().fetchLoginDetails(username);
+            //do login
+            return login(username,details.getPass(),broker);
+
+        }else{
+            throw new AuthenticationException(AuthenticationException.ACCOUNT_NOT_FOUND,"login failed");
+        }
     }
 
 
@@ -418,9 +429,8 @@ public class XQueryURLRewrite extends HttpServlet {
     * processing.
     *
     */
-    private Subject checkAuthentication(HttpServletRequest request, HttpServletResponse response, Subject user, DBBroker broker) throws ServletException, PermissionDeniedException, URISyntaxException, IOException {
+    private Subject checkAuthentication(HttpServletRequest request, HttpServletResponse response, Subject user, DBBroker broker) throws ServletException, PermissionDeniedException, URISyntaxException, IOException, EXistException, AuthenticationException {
 
-//        try {
             String appName = getAppNameFromRequest(request);
             String requestPath = request.getRequestURI();
 
@@ -439,35 +449,17 @@ public class XQueryURLRewrite extends HttpServlet {
                 RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + logout);
                 dispatcher.forward(request, response);
             }
-            if(isTokenValid(request,auth)){
-                //login to DB
-                return broker.getCurrentSubject();
 
+            Subject subject =  isTokenValid(request,broker);
+            if(subject != null) {
+                return subject;
             }
+
             if (isProtected(auth, requestPath)) {
                 return performLogin(request, response, broker);
             }
 
-/*
-            if (user.getName().equals("guest")) {
-                if (isProtected(auth, requestPath)) {
-                    return performLogin(request, response, broker);
-                }
-            } else {
-                if (!isTokenValid(request,auth)) {
-                    return performLogin(request, response, broker);
-                }
-            }
-*/
 
-/*
-        } catch (final Throwable e) {
-            LOG.error("Error while getting broker " + request.getRequestURI() + ": " + e.getMessage(), e);
-            throw new ServletException("An error occurred while processing request to " + request.getRequestURI() + ": "
-                    + e.getMessage(), e);
-
-        }
-*/
         return user;//default to returning the user that was passed in
 
     }
@@ -495,7 +487,8 @@ public class XQueryURLRewrite extends HttpServlet {
                 // checkAuthentication with eXistdb
                 // todo: return value 'user' needed at all?
                 subject = login(username, pass, broker);
-                setCookie(response,subject.getName(),RepoAuthCache.getInstance().getAuthInfo(appName));
+                UserAuth.registerUser(username,pass);
+                setCookie(response,subject.getName(),UserAuth.getInstance());
                 return subject;
             } catch (EXistException e) {
                 throw new ServletException(e);
@@ -1053,7 +1046,7 @@ public class XQueryURLRewrite extends HttpServlet {
         return subject;
     }
 
-    private void setCookie(HttpServletResponse response, String username, AppAuth auth) {
+    private void setCookie(HttpServletResponse response, String username, UserAuth auth) {
         //// TODO: create token
         // username + expiry date
         String token = auth.createToken(username);

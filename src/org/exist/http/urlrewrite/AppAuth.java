@@ -35,11 +35,6 @@ import javax.crypto.spec.SecretKeySpec;
 
 public class AppAuth {
 
-    private final String HMAC_KEY = "foobar";
-    private final String HMAC_ALG = "HmacSHA256";
-    private final String TOKEN_SEPARATOR = "|";
-    private final int TOKEN_LIFETIME = 300;  // 5min
-    private final String DEFAULT_COOKIE_NAME = "AppAuth";
 
     private String loginEndpoint;
     private String logoutEndpoint;
@@ -92,63 +87,9 @@ public class AppAuth {
         return this.urls;
     }
 
-    public String createToken(String username) {
-        long expires = Instant.now().getEpochSecond() + TOKEN_LIFETIME;
-        try {
-            String hmac = calcHMAC(username, Long.toString(expires));
-            return username + TOKEN_SEPARATOR + expires + TOKEN_SEPARATOR + hmac;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
 
     public String getUserName() {
         return userName;
     }
 
-    public boolean validateToken(String token) {
-        String hmac = null;
-        String[] fields = new String[3];
-        try {
-            fields = token.split(Pattern.quote(TOKEN_SEPARATOR));
-            hmac = calcHMAC(fields[0], fields[1]);
-        } catch (PatternSyntaxException |  UnsupportedEncodingException | NoSuchAlgorithmException| InvalidKeyException e) {
-            e.printStackTrace();
-        }
-        long now = Instant.now().getEpochSecond();
-        long l = Long.parseLong(fields[1]);
-        if (hmac.equals(fields[2]) && now <= l) {
-            this.userName = fields[0];
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    private String calcHMAC(String username, String tstamp) throws UnsupportedEncodingException, NoSuchAlgorithmException, InvalidKeyException {
-        String tokdata = username + TOKEN_SEPARATOR + tstamp;
-
-        try {
-            Mac hmac = Mac.getInstance(HMAC_ALG);
-            byte[] byteKey = HMAC_KEY.getBytes("ASCII");
-            SecretKeySpec keySpec = new SecretKeySpec(byteKey, HMAC_ALG);
-            hmac.init(keySpec);
-            byte[] hmac_data = hmac.doFinal(tokdata.getBytes("UTF-8"));
-            Formatter formatter = new Formatter();
-            for (byte b : hmac_data) {
-                formatter.format("%02x", b);
-            }
-            return formatter.toString();
-        } catch (UnsupportedEncodingException | NoSuchAlgorithmException |
-                InvalidKeyException e) {
-            throw e;
-        }
-
-    }
-
-
-    public String getCookieName() {
-        return DEFAULT_COOKIE_NAME;
-    }
 }
