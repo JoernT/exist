@@ -18,14 +18,12 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-package org.exist.http.urlrewrite;
-
-import org.eclipse.jetty.deploy.App;
+package org.exist.http.urlrewrite.appauth;
 
 import java.util.HashMap;
 import java.util.List;
 
-class RepoAuthCache {
+public class RepoAuthCache {
     private static RepoAuthCache instance = null;
     private static final HashMap<String, AppAuth> apps = new HashMap();
 

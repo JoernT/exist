@@ -35,6 +35,7 @@ import org.apache.logging.log4j.Logger;
 
 import org.exist.http.servlets.Authenticator;
 import org.exist.http.servlets.BasicAuthenticator;
+import org.exist.http.urlrewrite.appauth.*;
 import org.exist.security.SecurityManager;
 import org.exist.security.internal.web.HttpAccount;
 import org.exist.source.Source;
@@ -73,8 +74,6 @@ import org.w3c.dom.Node;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
-
-import org.exist.util.DOMUtil;
 
 import org.xml.sax.SAXException;
 import org.xmldb.api.base.Database;
@@ -192,12 +191,10 @@ public class XQueryURLRewrite extends HttpServlet {
 
         try {
 
-/*
-            Subject newUser = checkAuthentication(request, response, user);
-            if(newUser != null){
+            Subject newUser = new AppAuthenticator().authenticate(request, response, user, pool, config);
+            if (newUser != null) {
                 user = newUser;
             }
-*/
 
             configure();
             //checkCache(user);
@@ -206,8 +203,8 @@ public class XQueryURLRewrite extends HttpServlet {
             final RequestWrapper modifiedRequest = new RequestWrapper(request);
             final URLRewrite staticRewrite = rewriteConfig.lookup(modifiedRequest);
 
-            // checkAuthentication will return without effect if there's no authentication config in repo.xml
-//            user = checkAuthentication(request, response, user);
+            // authenticate will return without effect if there's no authentication config in repo.xml
+//            user = authenticate(request, response, user);
 
             if (staticRewrite != null && !staticRewrite.isControllerForward()) {
                 modifiedRequest.setPaths(staticRewrite.resolve(modifiedRequest), staticRewrite.getPrefix());
@@ -245,7 +242,7 @@ public class XQueryURLRewrite extends HttpServlet {
 
                     try (final DBBroker broker = pool.get(Optional.ofNullable(user))) {
 
-                        checkAuthentication(request, response, user,broker);
+//                        user = authenticate(request, response, user,broker);
 
                         modifiedRequest.setAttribute(RQ_ATTR_REQUEST_URI, request.getRequestURI());
 
@@ -399,24 +396,27 @@ public class XQueryURLRewrite extends HttpServlet {
         UserAuth userAuth = UserAuth.getInstance();
 
         Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return null;
+        }
         String cookieName = userAuth.getCookieName();
 
-        String username=null;
+        String username = null;
+        //todo: exit loop when cookie is found
         for (int i = 0; i < cookies.length; i++) {
             Cookie cookie1 = cookies[i];
             if (cookie1.getName().equals(cookieName)) {
-                username =  userAuth.validateToken(cookie1.getValue());
+                username = userAuth.validateToken(cookie1.getValue());
             }
         }
 
-        if (username != null){
+        if (username != null) {
             LoginDetails details = UserAuth.getInstance().fetchLoginDetails(username);
             //do login
-            return login(username,details.getPass(),broker);
+            return login(username, details.getPass(), broker);
 
-        }else{
-            throw new AuthenticationException(AuthenticationException.ACCOUNT_NOT_FOUND,"login failed");
         }
+        return null;
     }
 
 
@@ -429,44 +429,52 @@ public class XQueryURLRewrite extends HttpServlet {
     * processing.
     *
     */
-    private Subject checkAuthentication(HttpServletRequest request, HttpServletResponse response, Subject user, DBBroker broker) throws ServletException, PermissionDeniedException, URISyntaxException, IOException, EXistException, AuthenticationException {
+//    private Subject authenticate(HttpServletRequest request, HttpServletResponse response, Subject user, DBBroker broker) throws ServletException, PermissionDeniedException, URISyntaxException, IOException, EXistException, AuthenticationException {
+/*
+    private Subject authenticate(HttpServletRequest request, HttpServletResponse response, Subject user) throws ServletException, PermissionDeniedException, URISyntaxException, IOException, EXistException, AuthenticationException {
 
-            String appName = getAppNameFromRequest(request);
-            String requestPath = request.getRequestURI();
+        String appName = getAppNameFromRequest(request);
+        String requestPath = request.getRequestURI();
+
+        try (final DBBroker broker = pool.get(Optional.ofNullable(user))) {
 
             AppAuth auth = RepoAuthCache.getInstance().getAuthInfo(appName);
-            if(auth == null){
+            if (auth == null) {
                 //try to get repo.xml
                 auth = initAppAuth(broker, appName);
                 //if there's none just return
-                if(auth == null) return user;
+                if (auth == null) return user;
             }
 
             String logout = auth.getLogoutEndpoint();
             String logoutUrl = requestPath + "?" + request.getQueryString();
-            if(logoutUrl.indexOf(logout) != -1){
+            if (logoutUrl.indexOf(logout) != -1) {
+                //todo: invalidate user login
                 response.setContentType("text/html");
-                RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + logout);
-                dispatcher.forward(request, response);
+//                RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + logout);
+//                dispatcher.forward(request, response);
+                response.sendRedirect("/apps/" + appName + "/" + logout);
+
             }
 
-            Subject subject =  isTokenValid(request,broker);
-            if(subject != null) {
+            Subject subject = isTokenValid(request, broker);
+            if (subject != null) {
                 return subject;
             }
 
             if (isProtected(auth, requestPath)) {
                 return performLogin(request, response, broker);
             }
-
+        }
 
         return user;//default to returning the user that was passed in
 
     }
+*/
 
+/*
     private Subject performLogin(HttpServletRequest request, HttpServletResponse response, DBBroker broker) throws ServletException, IOException {
         String appName = getAppNameFromRequest(request);
-//        String loginPage = getLoginEndpoint(); // todo: will just return 'login.html' as default
         String loginPage = RepoAuthCache.getInstance().getAuthInfo(appName).getLoginEndpoint();
 
         Subject subject = null;
@@ -484,11 +492,11 @@ public class XQueryURLRewrite extends HttpServlet {
         } else {
             // login attempt if username is given
             try {
-                // checkAuthentication with eXistdb
+                // authenticate with eXistdb
                 // todo: return value 'user' needed at all?
                 subject = login(username, pass, broker);
-                UserAuth.registerUser(username,pass);
-                setCookie(response,subject.getName(),UserAuth.getInstance());
+                UserAuth.getInstance().registerUser(username, pass);
+                setCookie(response, subject.getName(), UserAuth.getInstance());
                 return subject;
             } catch (EXistException e) {
                 throw new ServletException(e);
@@ -506,16 +514,20 @@ public class XQueryURLRewrite extends HttpServlet {
         }
 
     }
+*/
 
 
+/*
     private boolean usesRepoAuth(Document repoXml) {
         if (repoXml != null) {
             return null != DOMUtil.getChildElementByLocalName(repoXml, "authentication");
         }
         return false;
     }
+*/
 
     //todo: this is fragile and must be improved - how can we determine the apps name from the request in a secure way?
+/*
     private String getAppNameFromRequest(HttpServletRequest request) {
         String s = request.getRequestURI();
         String[] tokens = s.split("/");
@@ -525,34 +537,13 @@ public class XQueryURLRewrite extends HttpServlet {
             return null;
         }
     }
-
-    // todo: properly implement this - just a default for now
-    private String getLoginEndpoint() {
-        //todo: fetch from RepoURLCache
-        return "login.html";
-    }
-
-    // todo: cache uris: key=app-name, values = list of uris
-//    private boolean isProtected(HttpServletRequest request, Subject user, DBBroker broker) throws ServletException, URISyntaxException, PermissionDeniedException {
-    private boolean isProtected(AppAuth auth, String requestPath) throws ServletException, URISyntaxException, PermissionDeniedException {
-
-/*
-        String appName = getAppNameFromRequest(request);
-        String requestPath = request.getRequestURI();
-
-        AppAuth auth = RepoAuthCache.getInstance().getAuthInfo(appName);
-        if(auth == null){
-            //try to get repo.xml
-            auth = initAppAuth(broker, appName);
-        }
 */
 
 
+/*
+    private boolean isProtected(AppAuth auth, String requestPath) throws ServletException, URISyntaxException, PermissionDeniedException {
 
-
-
-        //todo
-        if(auth != null){
+        if (auth != null) {
             //todo: implement
             //todo: check uri against whitelist of app
             List urls = auth.getWhiteList();
@@ -562,7 +553,7 @@ public class XQueryURLRewrite extends HttpServlet {
                 String url = (String) urls.get(i);
 
                 //todo: refine - just checking if requestURI contains a whitelisted item
-                if(requestPath.indexOf(url) != -1){
+                if (requestPath.indexOf(url) != -1) {
                     return false; //url is whitelisted
                 }
 
@@ -572,12 +563,10 @@ public class XQueryURLRewrite extends HttpServlet {
         // if there's no AppAuth
         return false;
 
-
-        //        return isAllowed(request.getRequestURI(),appName, appList);
-
-//        return false;
     }
+*/
 
+/*
     private AppAuth initAppAuth(DBBroker broker, String appName) throws PermissionDeniedException, URISyntaxException {
         Document repoXml = null;
         repoXml = broker.getXMLResource(XmldbURI.xmldbUriFor("xmldb:exist:///db/apps/" + appName + "/repo.xml"));
@@ -589,32 +578,34 @@ public class XQueryURLRewrite extends HttpServlet {
             if (authElem != null) {
                 LOG.debug("login-required element: ", authElem.getNodeName());
                 auth.setUrls(getWhitelistUrls(authElem));
-            }else{
+            } else {
                 return null;
             }
 
             Element mechanism = DOMUtil.getChildElementByLocalName(authElem, "mechanism");
             if (mechanism != null) {
                 Element loginEndPoint = DOMUtil.getChildElementByLocalName(mechanism, "login-endpoint");
-                if(loginEndPoint != null){
+                if (loginEndPoint != null) {
                     auth.setLoginEndpoint(loginEndPoint.getTextContent());
                 }
                 Element logoutEndpoint = DOMUtil.getChildElementByLocalName(mechanism, "logout-endpoint");
-                if(logoutEndpoint != null){
+                if (logoutEndpoint != null) {
                     auth.setLogoutEndpoint(logoutEndpoint.getTextContent());
                 }
                 Element loginFailed = DOMUtil.getChildElementByLocalName(mechanism, "login-fail");
-                if(loginFailed != null){
+                if (loginFailed != null) {
                     auth.setLoginFailed(loginFailed.getTextContent());
                 }
             }
-            RepoAuthCache.getInstance().setAuthInfo(appName,auth);
+            RepoAuthCache.getInstance().setAuthInfo(appName, auth);
             return auth;
         }
         return null;
     }
+*/
 
 
+/*
     private List getWhitelistUrls(Element authElem) {
         List allowed = new ArrayList();
         Element allowedElem = DOMUtil.getChildElementByLocalName(authElem, "allowed");
@@ -631,56 +622,9 @@ public class XQueryURLRewrite extends HttpServlet {
         }
         return allowed;
     }
-
-
-
-/*
-    private boolean isAllowed(HttpServletRequest request, Document repoXML, String appName) throws EXistException, URISyntaxException, PermissionDeniedException {
-
-        String requestPath = request.getRequestURI();
-        if (repoXML != null) {
-
-            // ### try to get list of whitelisted urls from cache
-            List allowedForApp = RepoAuthCache.getInstance().getAppList(appName);
-            if (allowedForApp != null && allowedForApp.size() != 0) {
-                return checkAllowed(allowedForApp);
-            } else {
-                Element authElem = DOMUtil.getChildElementByLocalName(repoXML, "authentication");
-                if (authElem != null) {
-                    LOG.debug("login-required element: ", authElem.getNodeName());
-                    List allowed = new ArrayList();
-                    Element allowedElem = DOMUtil.getChildElementByLocalName(authElem, "allowed");
-                    if (allowedElem != null) {
-                        //get uri elements and iterate them
-                        List<Element> list = DOMUtil.getChildElements(allowedElem);
-                        for (int i = 0; i < list.size(); i++) {
-                            Element element = list.get(i);
-                            if (element.getLocalName().equals("uri")) {
-                                String uriString = element.getTextContent();
-                                allowed.add(uriString);
 */
-/*
-                                if (requestPath.indexOf(uriString) != -1) {
-                                    return true;
-                                }
-*//*
 
-                            }
-                        }
-                        return checkAllowed(allowed);
-                    }
-                } else {
-                    // ### if there's no authentication element we need to continue 'old-style'
-                    return true;
-                }
-            }
 
-            // if no whitelist entry is found in the loop above
-            return false;
-        }
-        return true;
-    }
-*/
 
     private Subject getSubject(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Subject user = defaultUser;
@@ -1046,15 +990,6 @@ public class XQueryURLRewrite extends HttpServlet {
         return subject;
     }
 
-    private void setCookie(HttpServletResponse response, String username, UserAuth auth) {
-        //// TODO: create token
-        // username + expiry date
-        String token = auth.createToken(username);
-        String cookieName = auth.getCookieName();
-
-        Cookie cookie1 = new Cookie(cookieName, token);
-        response.addCookie(cookie1);
-    }
 
 
     protected String adjustPathForSourceLookup(String basePath, String path) {

@@ -18,9 +18,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-package org.exist.http.urlrewrite;
+package org.exist.http.urlrewrite.appauth;
 
-import org.exist.xquery.modules.persistentlogin.PersistentLogin;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -28,16 +27,14 @@ import java.io.UnsupportedEncodingException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.Formatter;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 public class UserAuth {
     private static UserAuth instance = null;
-    private static Map<String, LoginDetails> USERS = Collections.synchronizedMap(new HashMap<>());
+    private HashMap users = null;
 
     private final String HMAC_KEY = "foobar";
     private final String HMAC_ALG = "HmacSHA256";
@@ -47,6 +44,7 @@ public class UserAuth {
 
 
     protected UserAuth() {
+        this.users = new HashMap();
     }
 
     public static UserAuth getInstance() {
@@ -60,14 +58,14 @@ public class UserAuth {
         return instance;
     }
 
-    public static void registerUser(String user, String password){
+    public void registerUser(String user, String password){
         LoginDetails details = new LoginDetails(password);
 //        UserAuth.users.put()
-        UserAuth.USERS.put(user, details);
+        this.users.put(user, details);
     }
 
-    public static LoginDetails fetchLoginDetails(String username){
-        return UserAuth.USERS.get(username);
+    public LoginDetails fetchLoginDetails(String username){
+        return (LoginDetails) this.users.get(username);
     }
 
     public String createToken(String username) {
@@ -89,10 +87,17 @@ public class UserAuth {
         } catch (PatternSyntaxException | UnsupportedEncodingException | NoSuchAlgorithmException | InvalidKeyException e) {
             e.printStackTrace();
         }
+
+        UserAuth userAuth = UserAuth.getInstance();
+        LoginDetails details = userAuth.fetchLoginDetails(fields[0]);
+        if(details == null){
+            //we might run here in case there's an old cookie containing a parseable token
+            return null;
+        }
+
         long now = Instant.now().getEpochSecond();
-        LoginDetails details = UserAuth.getInstance().fetchLoginDetails(fields[0]);
-        long l = details.getLastAccessed();
-        if (hmac.equals(fields[1]) && now < l + TOKEN_LIFETIME) {
+        long lastAccessed = details.getLastAccessed();
+        if (hmac.equals(fields[1]) && now < lastAccessed + TOKEN_LIFETIME) {
             details.updateLastAccessed();
             return fields[0];
         } else {

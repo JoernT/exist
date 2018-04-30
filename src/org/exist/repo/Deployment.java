@@ -30,6 +30,7 @@ import org.exist.collections.triggers.TriggerException;
 import org.exist.dom.QName;
 import org.exist.dom.memtree.*;
 import org.exist.dom.persistent.BinaryDocument;
+import org.exist.http.urlrewrite.appauth.RepoAuthCache;
 import org.exist.security.Permission;
 import org.exist.security.PermissionDeniedException;
 import org.exist.security.internal.aider.GroupAider;
@@ -587,7 +588,11 @@ public class Deployment {
                     broker.removeCollection(transaction, collection);
                 }
             }
+
             //todo: remove AppAuth entry from RepoAuthCache
+            RepoAuthCache cachedAuth = RepoAuthCache.getInstance();
+            cachedAuth.removeApp(pkg.getAbbrev());
+
 
             mgr.commit(transaction);
         } catch (final Exception e) {
