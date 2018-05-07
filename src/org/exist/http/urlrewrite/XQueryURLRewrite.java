@@ -392,6 +392,7 @@ public class XQueryURLRewrite extends HttpServlet {
         }
     }
 
+/*
     private Subject isTokenValid(HttpServletRequest request, DBBroker broker) throws EXistException, AuthenticationException {
         UserAuth userAuth = UserAuth.getInstance();
 
@@ -418,6 +419,7 @@ public class XQueryURLRewrite extends HttpServlet {
         }
         return null;
     }
+*/
 
 
     /*

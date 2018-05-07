@@ -44,7 +44,7 @@ Please note the exchanged columns for eXist-db Core and controller.xql.
 
 The new approach changes the flow to:
 
-1. 1. a request reaches XQueryURLRewrite servlet. This is configured to handle all incoming requests
+1. a request reaches XQueryURLRewrite servlet. This is configured to handle all incoming requests
 2. the new AppAuthenticator will check if the requested resource is protected (see below)
 3. if yes a database login is attempted. In case of success the username will be passed to the controller as an external variable called $exist:user. This may then be used to check authorization for the given user. In case of failure the request is sent to the login procedure.
 

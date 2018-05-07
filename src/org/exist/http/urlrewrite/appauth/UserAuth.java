@@ -58,13 +58,13 @@ public class UserAuth {
         return instance;
     }
 
-    public void registerUser(String user, String password){
+    public void registerUser(String user, String password) {
         LoginDetails details = new LoginDetails(password);
 //        UserAuth.users.put()
         this.users.put(user, details);
     }
 
-    public LoginDetails fetchLoginDetails(String username){
+    public LoginDetails fetchLoginDetails(String username) {
         return (LoginDetails) this.users.get(username);
     }
 
@@ -78,7 +78,11 @@ public class UserAuth {
             return null;
         }
     }
+
     public String validateToken(String token) {
+        if (token == null) {
+            return null;
+        }
         String hmac = null;
         String[] fields = new String[2];
         try {
@@ -86,11 +90,12 @@ public class UserAuth {
             hmac = calcHMAC(fields[0]);
         } catch (PatternSyntaxException | UnsupportedEncodingException | NoSuchAlgorithmException | InvalidKeyException e) {
             e.printStackTrace();
+            return null; //todo: check: shouldn't we return null in case the token cannot be parsed or calculated?
         }
 
         UserAuth userAuth = UserAuth.getInstance();
         LoginDetails details = userAuth.fetchLoginDetails(fields[0]);
-        if(details == null){
+        if (details == null) {
             //we might run here in case there's an old cookie containing a parseable token
             return null;
         }
@@ -132,4 +137,7 @@ public class UserAuth {
     }
 
 
+    public void removeUserAuth(String username) {
+        users.remove(username);
+    }
 }

@@ -74,17 +74,6 @@ public class AppAuthenticator {
                 if (auth == null) return user;
             }
 
-            String logout = auth.getLogoutEndpoint();
-            String logoutUrl = requestPath + "?" + request.getQueryString();
-            if (logoutUrl.indexOf(logout) != -1) {
-                //todo: invalidate user login
-                response.setContentType("text/html");
-//                RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + logout);
-//                dispatcher.forward(request, response);
-                response.sendRedirect("/apps/" + appName + "/" + logout);
-
-            }
-
             Subject subject = isTokenValid(request, broker);
             if (subject != null) {
                 return subject;
@@ -93,6 +82,18 @@ public class AppAuthenticator {
             if (isProtected(auth, requestPath)) {
                 return performLogin(request, response, broker, config);
             }
+
+            String logout = auth.getLogoutEndpoint();
+            String logoutUrl = requestPath + "?" + request.getQueryString();
+            if (logoutUrl.indexOf(logout) != -1) {
+                //todo: invalidate user login
+                String userName = subject.getName();
+                UserAuth.getInstance().removeUserAuth(userName);
+                response.setContentType("text/html");
+                String logoutRedirect = auth.getLogoutRedirect();
+                response.sendRedirect("/apps/" + appName + "/" + logoutRedirect);
+            }
+
         }
 
         return user; //default to returning the user that was passed in (usually guest)
@@ -122,7 +123,7 @@ public class AppAuthenticator {
 
     }
 
-    private Subject isTokenValid(HttpServletRequest request, DBBroker broker) throws EXistException, AuthenticationException {
+    private String getCookieValue(HttpServletRequest request){
         UserAuth userAuth = UserAuth.getInstance();
 
         Cookie[] cookies = request.getCookies();
@@ -131,21 +132,30 @@ public class AppAuthenticator {
         }
         String cookieName = userAuth.getCookieName();
 
-        String username = null;
         //todo: exit loop when cookie is found
         for (int i = 0; i < cookies.length; i++) {
             Cookie cookie1 = cookies[i];
             if (cookie1.getName().equals(cookieName)) {
-                username = userAuth.validateToken(cookie1.getValue());
+                return cookie1.getValue();
             }
         }
+        return null;
+    }
 
+    private Subject isTokenValid(HttpServletRequest request, DBBroker broker) throws EXistException, AuthenticationException {
+        UserAuth userAuth = UserAuth.getInstance();
+        String username = null;
+
+        username = userAuth.validateToken(getCookieValue(request));
         if (username != null) {
             LoginDetails details = UserAuth.getInstance().fetchLoginDetails(username);
             //do login
             return login(username, details.getPass(), broker);
 
+        }else{
+            UserAuth.getInstance().removeUserAuth(username);
         }
+
         return null;
     }
 
@@ -179,6 +189,7 @@ public class AppAuthenticator {
                 throw new ServletException(e);
             } catch (AuthenticationException e) {
                 //future todo: login counter?
+                //todo: change to redirect
 
                 String loginFailed = RepoAuthCache.getInstance().getAuthInfo(appName).getLoginFailed();
                 response.setContentType("text/html");
@@ -235,6 +246,7 @@ public class AppAuthenticator {
                 Element logoutEndpoint = DOMUtil.getChildElementByLocalName(mechanism, "logout-endpoint");
                 if (logoutEndpoint != null) {
                     auth.setLogoutEndpoint(logoutEndpoint.getTextContent());
+                    auth.setLogoutRedirect(loginEndPoint.getAttribute("redirect"));
                 }
                 Element loginFailed = DOMUtil.getChildElementByLocalName(mechanism, "login-fail");
                 if (loginFailed != null) {

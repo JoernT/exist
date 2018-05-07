@@ -41,6 +41,7 @@ public class AppAuth {
     private String loginFailed;
     private List urls = new ArrayList();
     private String userName = null;
+    private String logoutRedirect;
 
     public AppAuth() {
         loginEndpoint = null;
@@ -59,6 +60,10 @@ public class AppAuth {
 
     public String getLogoutEndpoint() {
         return this.logoutEndpoint;
+    }
+
+    public String getLogoutRedirect(){
+        return this.logoutRedirect;
     }
 
     public void setLogoutEndpoint(String endPoint) {
@@ -92,4 +97,7 @@ public class AppAuth {
         return userName;
     }
 
+    public void setLogoutRedirect(String logoutRedirect) {
+        this.logoutRedirect = logoutRedirect;
+    }
 }

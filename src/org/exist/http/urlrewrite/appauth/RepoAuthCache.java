@@ -51,11 +51,7 @@ public class RepoAuthCache {
     }
 
     public static AppAuth getAuthInfo(String appKey){
-        AppAuth auth = RepoAuthCache.apps.get(appKey);
-        if(auth == null){
-
-        }
-        return auth;
+        return RepoAuthCache.apps.get(appKey);
     }
 
     public static void removeApp(String appKey){
