@@ -49,7 +49,7 @@ public class AppAuthenticator {
     /*
     * Authenticate the given user according to configuration given in the repo.xml of the requested app.
     *
-    * In case an <authentication> Element is found in repo.xml the requested path
+    * In case an <authentication> Element is found in repo.xml the requested path will be handled by this Authenticator.
     *
     * If no <authentication> Element is given in repo.xml this method just exists to allow backward-compatible
     * processing.
@@ -242,15 +242,12 @@ public class AppAuthenticator {
                 Element loginEndPoint = DOMUtil.getChildElementByLocalName(mechanism, "login-endpoint");
                 if (loginEndPoint != null) {
                     auth.setLoginEndpoint(loginEndPoint.getTextContent());
+                    auth.setLoginFailed(loginEndPoint.getAttribute("redirect-on-fail"));
                 }
                 Element logoutEndpoint = DOMUtil.getChildElementByLocalName(mechanism, "logout-endpoint");
                 if (logoutEndpoint != null) {
                     auth.setLogoutEndpoint(logoutEndpoint.getTextContent());
                     auth.setLogoutRedirect(loginEndPoint.getAttribute("redirect"));
-                }
-                Element loginFailed = DOMUtil.getChildElementByLocalName(mechanism, "login-fail");
-                if (loginFailed != null) {
-                    auth.setLoginFailed(loginFailed.getTextContent());
                 }
             }
             RepoAuthCache.getInstance().setAuthInfo(appName, auth);

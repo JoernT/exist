@@ -89,3 +89,23 @@ Once the concept has been approved it is planned to add more mechanisms such as 
 The new mechanism is opt-in and fully backward compatible with existing applications that may continue to use the old login module.
 
 That means that only if you provide an ```<authentication>``` element in repo.xml the AppAuthenticator will be executed - if that element is not present the app will be processed just as before.
+
+## Current limitations
+
+The current design builds on the following assumptions:
+
+1. the majority of apps is using a login form
+1. a single authorisation token for all apps is sufficient
+
+
+### Default login mechanism
+
+The default mechanism which we implemented for AppAuthenticator is 'builtin' which means to use a login.html file for authenticating users (which of course should be protected by a SSL connection). We assume that this covers the big majority of eXist-db apps and therefore was chosen as first target. But of course the idea is to support several mechanisms here and SAML will be next to be pluggable here.
+
+### Single sign-on
+
+It's still a bit of an open questions if this is a limitation or a feature.
+
+The current implementation authenticates users by setting a token which identifies the user against the database. This token is valid for all applications which means: if you're authenticated for one app you're authenticated for all others. When logging out of one app you'll be logged out for all apps.
+
+While we're aware that there's a concept of app domains we actually couldn't think of a use case where this will be needed - in the current implementation a user is authenticated once however it is a different question which actual rights for certain resources apply. This should be handled on the authorization level (controller.xql) by checking membership in certain groups.
