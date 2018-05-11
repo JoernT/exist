@@ -90,6 +90,17 @@ public class AppAuthenticator {
 
             Subject subject = isTokenValid(request, broker, appName);
             if (subject != null) {
+
+                //check for a logout
+                String logout = auth.getLogoutEndpoint();
+                if (requestPath.endsWith(logout)) {
+                    String userName = subject.getName();
+                    UserAuth.getInstance().removeUserAuth(userName);
+                    String logoutRedirect = auth.getLogoutRedirect();
+                    response.setContentType("text/html");
+                    response.sendRedirect("/apps/" + appName + "/" + logoutRedirect);
+                }
+
                 return subject;
             }
 
@@ -97,15 +108,6 @@ public class AppAuthenticator {
                 return performLogin(request, response, broker, config);
             }
 
-            String logout = auth.getLogoutEndpoint();
-            String logoutUrl = requestPath + "?" + request.getQueryString();
-            if (logoutUrl.endsWith(logout)) {
-                String userName = subject.getName();
-                UserAuth.getInstance().removeUserAuth(userName);
-                response.setContentType("text/html");
-                String logoutRedirect = auth.getLogoutRedirect();
-                response.sendRedirect("/apps/" + appName + "/" + logoutRedirect);
-            }
 
         }
 
@@ -113,42 +115,36 @@ public class AppAuthenticator {
 
     }
 
-
+    /**
+     * checks requestPath against whitelist of URLs for respective AppAuth. The check
+     * will take place only for apps that use an <authentication> element in their repo.xml.
+     *
+     * @param auth the AppAuth object for the requested app
+     * @param requestPath the requestPath
+     * @return true if requestPath is NOT found in whitelist.
+     */
     private boolean isProtected(AppAuth auth, String requestPath) {
 
         if (auth != null) {
             List urls = auth.getWhiteList();
-            return !urls.contains(requestPath);
-
-            //todo: this may be more efficient?
-/*
-            for (int i = 0; i < urls.size(); i++) {
-                String url = (String) urls.get(i);
-
-                //todo: refine - just checking if requestURI contains a whitelisted item
-                if (requestPath.contains(url)) {
+            for (Object url1 : urls) {
+                String url = (String) url1;
+                //todo: refine - just checking if requestURI ends with a whitelisted item - apply some regex (glob support)?
+                if (requestPath.endsWith(url)) {
                     return false; //url is whitelisted
                 }
-
             }
             return true;
-*/
         }
         // if there's no AppAuth
         return false;
-
     }
 
     private String getCookieValue(HttpServletRequest request){
-//        UserAuth userAuth = UserAuth.getInstance();
-
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
             return null;
         }
-//        String cookieName = userAuth.getCookieName();
-
-        //todo: exit loop when cookie is found
         for (Cookie cookie1 : cookies) {
             if (cookie1.getName().equals(DEFAULT_COOKIE_NAME)) {
                 return cookie1.getValue();
@@ -158,8 +154,6 @@ public class AppAuthenticator {
     }
 
     private Subject isTokenValid(HttpServletRequest request, DBBroker broker, String appName) throws EXistException, AuthenticationException {
-//        UserAuth userAuth = UserAuth.getInstance();
-//        username = userAuth.validateToken(getCookieValue(request), appName);
         String username;
         username = validateToken(getCookieValue(request), appName);
         if (username != null) {
@@ -190,12 +184,11 @@ public class AppAuthenticator {
             response.setContentType("text/html");
             RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginPage);
             dispatcher.forward(request, response);
-            return null;
+//            return null;
         } else {
             // login attempt if username is given
             try {
                 // authenticate with eXistdb
-                // todo: return value 'user' needed at all?
                 subject = login(username, pass, broker);
                 UserAuth.getInstance().registerUser(username, pass, appName);
                 setCookie(response, subject.getName());
@@ -204,18 +197,13 @@ public class AppAuthenticator {
                 throw new ServletException(e);
             } catch (AuthenticationException e) {
                 //future todo: login counter?
-                //todo: change to redirect
-
                 String loginFailed = RepoAuthCache.getInstance().getAuthInfo(appName).getLoginFailed();
                 response.setContentType("text/html");
-                // as this login attempt failed we append a 'failed=true' parameter to the request. This can be picked up by a client for displaying an error
-//                RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginFailedUrl);
-                RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginFailed);
-                dispatcher.forward(request, response);
-                return null;
+                response.sendRedirect("/apps/" + appName + "/" + loginFailed);
+//                return null;
             }
         }
-
+        return null;
     }
 
     private void setCookie(HttpServletResponse response, String username) {

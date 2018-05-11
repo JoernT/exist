@@ -206,6 +206,7 @@ public class XQueryURLRewrite extends HttpServlet {
             // authenticate will return without effect if there's no authentication config in repo.xml
 //            user = authenticate(request, response, user);
 
+
             if (staticRewrite != null && !staticRewrite.isControllerForward()) {
                 modifiedRequest.setPaths(staticRewrite.resolve(modifiedRequest), staticRewrite.getPrefix());
 
@@ -241,6 +242,7 @@ public class XQueryURLRewrite extends HttpServlet {
                     Sequence result = Sequence.EMPTY_SEQUENCE;
 
                     try (final DBBroker broker = pool.get(Optional.ofNullable(user))) {
+//                        final SourceInfo sourceInfo = getSourceInfo(broker, modifiedRequest, staticRewrite);
 
 //                        user = authenticate(request, response, user,broker);
 
