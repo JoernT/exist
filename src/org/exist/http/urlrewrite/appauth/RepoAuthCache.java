@@ -46,11 +46,11 @@ public class RepoAuthCache {
         return (List) RepoAuthCache.apps.get(appKey);
     }
 
-    public static void setAuthInfo(String appKey, AppAuth auth){
+    public void setAuthInfo(String appKey, AppAuth auth){
         RepoAuthCache.apps.put(appKey,auth);
     }
 
-    public static AppAuth getAuthInfo(String appKey){
+    public AppAuth getAuthInfo(String appKey){
         return RepoAuthCache.apps.get(appKey);
     }
 

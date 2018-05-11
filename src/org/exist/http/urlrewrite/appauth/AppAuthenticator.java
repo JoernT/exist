@@ -32,6 +32,8 @@ import org.exist.xmldb.XmldbURI;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -39,12 +41,24 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Formatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 public class AppAuthenticator {
+    private static final String DEFAULT_COOKIE_NAME = "AppAuth";
+
+    private final String HMAC_KEY = "foobar";
+    private final String HMAC_ALG = "HmacSHA256";
+    private final String TOKEN_SEPARATOR = "|";
 
     /*
     * Authenticate the given user according to configuration given in the repo.xml of the requested app.
@@ -74,7 +88,7 @@ public class AppAuthenticator {
                 if (auth == null) return user;
             }
 
-            Subject subject = isTokenValid(request, broker);
+            Subject subject = isTokenValid(request, broker, appName);
             if (subject != null) {
                 return subject;
             }
@@ -85,8 +99,7 @@ public class AppAuthenticator {
 
             String logout = auth.getLogoutEndpoint();
             String logoutUrl = requestPath + "?" + request.getQueryString();
-            if (logoutUrl.indexOf(logout) != -1) {
-                //todo: invalidate user login
+            if (logoutUrl.endsWith(logout)) {
                 String userName = subject.getName();
                 UserAuth.getInstance().removeUserAuth(userName);
                 response.setContentType("text/html");
@@ -101,22 +114,25 @@ public class AppAuthenticator {
     }
 
 
-    private boolean isProtected(AppAuth auth, String requestPath) throws ServletException, URISyntaxException, PermissionDeniedException {
+    private boolean isProtected(AppAuth auth, String requestPath) {
 
         if (auth != null) {
             List urls = auth.getWhiteList();
+            return !urls.contains(requestPath);
 
             //todo: this may be more efficient?
+/*
             for (int i = 0; i < urls.size(); i++) {
                 String url = (String) urls.get(i);
 
                 //todo: refine - just checking if requestURI contains a whitelisted item
-                if (requestPath.indexOf(url) != -1) {
+                if (requestPath.contains(url)) {
                     return false; //url is whitelisted
                 }
 
             }
             return true;
+*/
         }
         // if there's no AppAuth
         return false;
@@ -124,35 +140,35 @@ public class AppAuthenticator {
     }
 
     private String getCookieValue(HttpServletRequest request){
-        UserAuth userAuth = UserAuth.getInstance();
+//        UserAuth userAuth = UserAuth.getInstance();
 
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
             return null;
         }
-        String cookieName = userAuth.getCookieName();
+//        String cookieName = userAuth.getCookieName();
 
         //todo: exit loop when cookie is found
-        for (int i = 0; i < cookies.length; i++) {
-            Cookie cookie1 = cookies[i];
-            if (cookie1.getName().equals(cookieName)) {
+        for (Cookie cookie1 : cookies) {
+            if (cookie1.getName().equals(DEFAULT_COOKIE_NAME)) {
                 return cookie1.getValue();
             }
         }
         return null;
     }
 
-    private Subject isTokenValid(HttpServletRequest request, DBBroker broker) throws EXistException, AuthenticationException {
-        UserAuth userAuth = UserAuth.getInstance();
-        String username = null;
-
-        username = userAuth.validateToken(getCookieValue(request));
+    private Subject isTokenValid(HttpServletRequest request, DBBroker broker, String appName) throws EXistException, AuthenticationException {
+//        UserAuth userAuth = UserAuth.getInstance();
+//        username = userAuth.validateToken(getCookieValue(request), appName);
+        String username;
+        username = validateToken(getCookieValue(request), appName);
         if (username != null) {
             LoginDetails details = UserAuth.getInstance().fetchLoginDetails(username);
             //do login
             return login(username, details.getPass(), broker);
 
         }else{
+            //todo: username is always null
             UserAuth.getInstance().removeUserAuth(username);
         }
 
@@ -161,10 +177,9 @@ public class AppAuthenticator {
 
     private Subject performLogin(HttpServletRequest request, HttpServletResponse response, DBBroker broker, ServletConfig config) throws ServletException, IOException {
         String appName = getAppNameFromRequest(request);
-//        String loginPage = getLoginEndpoint(); // todo: will just return 'login.html' as default
         String loginPage = RepoAuthCache.getInstance().getAuthInfo(appName).getLoginEndpoint();
 
-        Subject subject = null;
+        Subject subject;
 
         //try to get username
         String username = request.getParameter("user");
@@ -182,8 +197,8 @@ public class AppAuthenticator {
                 // authenticate with eXistdb
                 // todo: return value 'user' needed at all?
                 subject = login(username, pass, broker);
-                UserAuth.getInstance().registerUser(username, pass);
-                setCookie(response, subject.getName(), UserAuth.getInstance());
+                UserAuth.getInstance().registerUser(username, pass, appName);
+                setCookie(response, subject.getName());
                 return subject;
             } catch (EXistException e) {
                 throw new ServletException(e);
@@ -203,13 +218,14 @@ public class AppAuthenticator {
 
     }
 
-    private void setCookie(HttpServletResponse response, String username, UserAuth auth) {
+    private void setCookie(HttpServletResponse response, String username) {
         //// TODO: create token
         // username + expiry date
-        String token = auth.createToken(username);
-        String cookieName = auth.getCookieName();
+//        String token = auth.createToken(username);
+        String token = createToken(username);
+//        String cookieName = auth.getCookieName();
 
-        Cookie cookie1 = new Cookie(cookieName, token);
+        Cookie cookie1 = new Cookie(DEFAULT_COOKIE_NAME, token);
         response.addCookie(cookie1);
     }
 
@@ -224,14 +240,16 @@ public class AppAuthenticator {
 
 
     private AppAuth initAppAuth(DBBroker broker, String appName) throws PermissionDeniedException, URISyntaxException {
-        Document repoXml = null;
-        repoXml = broker.getXMLResource(XmldbURI.xmldbUriFor("xmldb:exist:///db/apps/" + appName + "/repo.xml"));
+        Document repoXml = broker.getXMLResource(XmldbURI.xmldbUriFor("xmldb:exist:///db/apps/" + appName + "/repo.xml"));
 
         if (repoXml != null) {
             AppAuth auth = new AppAuth();
-            // ### try to get list of whitelisted urls from cache
             Element authElem = DOMUtil.getChildElementByLocalName(repoXml, "authentication");
             if (authElem != null) {
+                if(authElem.hasAttribute("lifetime")){
+                    String s = authElem.getAttribute("lifetime");
+                    auth.setLifeTime(Integer.parseInt(s));
+                }
                 auth.setUrls(getWhitelistUrls(authElem));
             } else {
                 return null;
@@ -247,7 +265,9 @@ public class AppAuthenticator {
                 Element logoutEndpoint = DOMUtil.getChildElementByLocalName(mechanism, "logout-endpoint");
                 if (logoutEndpoint != null) {
                     auth.setLogoutEndpoint(logoutEndpoint.getTextContent());
-                    auth.setLogoutRedirect(loginEndPoint.getAttribute("redirect"));
+                    if(logoutEndpoint.hasAttribute("redirect")){
+                        auth.setLogoutRedirect(logoutEndpoint.getAttribute("redirect"));
+                    }
                 }
             }
             RepoAuthCache.getInstance().setAuthInfo(appName, auth);
@@ -262,8 +282,7 @@ public class AppAuthenticator {
         if (allowedElem != null) {
             //get uri elements and iterate them
             List<Element> list = DOMUtil.getChildElements(allowedElem);
-            for (int i = 0; i < list.size(); i++) {
-                Element element = list.get(i);
+            for (Element element : list) {
                 if (element.getLocalName().equals("uri")) {
                     String uriString = element.getTextContent();
                     allowed.add(uriString);
@@ -284,6 +303,75 @@ public class AppAuthenticator {
             return null;
         }
     }
+
+
+    private String createToken(String username) {
+        try {
+            String hmac = calcHMAC(username);
+            return username + TOKEN_SEPARATOR + hmac;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private String validateToken(String token, String appName) {
+        if (token == null) {
+            return null;
+        }
+        String hmac;
+        String[] fields;
+        try {
+            fields = token.split(Pattern.quote(TOKEN_SEPARATOR));
+            hmac = calcHMAC(fields[0]);
+        } catch (PatternSyntaxException | UnsupportedEncodingException | NoSuchAlgorithmException | InvalidKeyException e) {
+            e.printStackTrace();
+            return null; //todo: check: shouldn't we return null in case the token cannot be parsed or calculated?
+        }
+
+        UserAuth userAuth = UserAuth.getInstance();
+        LoginDetails details = userAuth.fetchLoginDetails(fields[0]);
+        if (details == null) {
+            //we might run here in case there's an old cookie containing a parseable token
+            return null;
+        }
+
+        long now = Instant.now().getEpochSecond();
+        long lastAccessed = details.getLastAccessed(appName);
+
+        AppAuth auth = RepoAuthCache.getInstance().getAuthInfo(appName);
+
+//        if (hmac.equals(fields[1]) && now < lastAccessed + tokenLifetime) {
+        if (hmac.equals(fields[1]) && now < lastAccessed + auth.getLifeTime()) {
+            details.updateLastAccessed(appName);
+            return fields[0];
+        } else {
+            return null;
+        }
+    }
+
+    private String calcHMAC(String username) throws UnsupportedEncodingException, NoSuchAlgorithmException, InvalidKeyException {
+//        String tokdata = username + TOKEN_SEPARATOR + tstamp;
+
+        try {
+            Mac hmac = Mac.getInstance(HMAC_ALG);
+            byte[] byteKey = HMAC_KEY.getBytes("ASCII");
+            SecretKeySpec keySpec = new SecretKeySpec(byteKey, HMAC_ALG);
+            hmac.init(keySpec);
+            byte[] hmac_data = hmac.doFinal(username.getBytes("UTF-8"));
+            Formatter formatter = new Formatter();
+            for (byte b : hmac_data) {
+                formatter.format("%02x", b);
+            }
+            return formatter.toString();
+        } catch (UnsupportedEncodingException | NoSuchAlgorithmException |
+                InvalidKeyException e) {
+            throw e;
+        }
+
+    }
+
+
 
 
 }

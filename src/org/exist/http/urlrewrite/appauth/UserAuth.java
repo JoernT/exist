@@ -21,26 +21,17 @@
 package org.exist.http.urlrewrite.appauth;
 
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.io.UnsupportedEncodingException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.time.Instant;
-import java.util.Formatter;
 import java.util.HashMap;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 
 public class UserAuth {
     private static UserAuth instance = null;
     private HashMap users = null;
 
-    private final String HMAC_KEY = "foobar";
-    private final String HMAC_ALG = "HmacSHA256";
-    private final String TOKEN_SEPARATOR = "|";
-    private final int TOKEN_LIFETIME = 300;  // 5min
-    private final String DEFAULT_COOKIE_NAME = "AppAuth";
+//    private final String HMAC_KEY = "foobar";
+//    private final String HMAC_ALG = "HmacSHA256";
+//    private final String TOKEN_SEPARATOR = "|";
+//    private final String DEFAULT_COOKIE_NAME = "AppAuth";
+//    private int tokenLifetime = 900;  // 15min
 
 
     protected UserAuth() {
@@ -58,8 +49,8 @@ public class UserAuth {
         return instance;
     }
 
-    public void registerUser(String user, String password) {
-        LoginDetails details = new LoginDetails(password);
+    public void registerUser(String user, String password, String appName) {
+        LoginDetails details = new LoginDetails(appName, password);
 //        UserAuth.users.put()
         this.users.put(user, details);
     }
@@ -68,8 +59,8 @@ public class UserAuth {
         return (LoginDetails) this.users.get(username);
     }
 
+/*
     public String createToken(String username) {
-//        long expires = Instant.now().getEpochSecond() + TOKEN_LIFETIME;
         try {
             String hmac = calcHMAC(username);
             return username + TOKEN_SEPARATOR + hmac;
@@ -79,7 +70,7 @@ public class UserAuth {
         }
     }
 
-    public String validateToken(String token) {
+    public String validateToken(String token, String appName) {
         if (token == null) {
             return null;
         }
@@ -101,9 +92,13 @@ public class UserAuth {
         }
 
         long now = Instant.now().getEpochSecond();
-        long lastAccessed = details.getLastAccessed();
-        if (hmac.equals(fields[1]) && now < lastAccessed + TOKEN_LIFETIME) {
-            details.updateLastAccessed();
+        long lastAccessed = details.getLastAccessed(appName);
+
+        AppAuth auth = RepoAuthCache.getAuthInfo(appName);
+
+//        if (hmac.equals(fields[1]) && now < lastAccessed + tokenLifetime) {
+        if (hmac.equals(fields[1]) && now < lastAccessed + auth.getLifeTime()) {
+            details.updateLastAccessed(appName);
             return fields[0];
         } else {
             return null;
@@ -130,11 +125,14 @@ public class UserAuth {
         }
 
     }
+*/
 
 
+/*
     public String getCookieName() {
         return DEFAULT_COOKIE_NAME;
     }
+*/
 
 
     public void removeUserAuth(String username) {

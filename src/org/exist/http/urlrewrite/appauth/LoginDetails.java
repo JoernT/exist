@@ -21,18 +21,21 @@
 package org.exist.http.urlrewrite.appauth;
 
 import java.time.Instant;
+import java.util.HashMap;
 
 public class LoginDetails {
 
 //    private String user = null;
     private String pass = null;
-    private long lastAccessed = 0;
+//    private long lastAccessed = 0;
+    private HashMap lastAccessed = new HashMap();
 
 //    public LoginDetails(String user, String pass){
-    public LoginDetails(String pass){
+    public LoginDetails(String appName, String pass){
 //        this.user = user;
         this.pass = pass;
-        this.lastAccessed = Instant.now().getEpochSecond();;
+        this.lastAccessed.put(appName, Instant.now().getEpochSecond());
+//        this.lastAccessed = Instant.now().getEpochSecond();;
     }
 
 
@@ -40,11 +43,12 @@ public class LoginDetails {
         return pass;
     }
 
-    public long getLastAccessed(){
-        return this.lastAccessed;
+    public long getLastAccessed(String appName){
+        return (long) this.lastAccessed.get(appName);
     }
 
-    public void updateLastAccessed(){
-        this.lastAccessed = Instant.now().getEpochSecond();
+    public void updateLastAccessed(String appName){
+        this.lastAccessed.put(appName, Instant.now().getEpochSecond());
+//        this.lastAccessed = Instant.now().getEpochSecond();
     }
 }

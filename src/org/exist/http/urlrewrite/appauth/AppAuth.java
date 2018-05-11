@@ -20,18 +20,8 @@
 
 package org.exist.http.urlrewrite.appauth;
 
-import java.io.UnsupportedEncodingException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SignatureException;
-import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Formatter;
 import java.util.List;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 
 public class AppAuth {
 
@@ -42,6 +32,7 @@ public class AppAuth {
     private List urls = new ArrayList();
     private String userName = null;
     private String logoutRedirect;
+    private int lifeTime =  900;  // defaults to 15min
 
     public AppAuth() {
         loginEndpoint = null;
@@ -99,5 +90,13 @@ public class AppAuth {
 
     public void setLogoutRedirect(String logoutRedirect) {
         this.logoutRedirect = logoutRedirect;
+    }
+
+    public int getLifeTime() {
+        return this.lifeTime;
+    }
+
+    public void setLifeTime(int lifeTime) {
+        this.lifeTime = lifeTime;
     }
 }
