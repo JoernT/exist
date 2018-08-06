@@ -229,49 +229,65 @@ public class AppAuthenticator {
         return subject;
     }
 
+    /* Methods to create an AppAuth data instance from repo.xml.
+     * These are run only once on app initialization.
+     */
 
+    /* Parse repo.xml and create AppAuth data from "authentication" element.
+     * Throw exception if repo.xml cannot be accessed.
+     * Return null if there is no "authentication" element in repo.xml.
+     * Otherwise return AppAuth instance inititialized from system defaults,
+     * possibly overridden by settings in the "authentication" element.
+     */
     private AppAuth initAppAuth(DBBroker broker, String appName) throws PermissionDeniedException, URISyntaxException {
+	// throws exceptions if repo.xml cannot be accessed
         Document repoXml = broker.getXMLResource(XmldbURI.xmldbUriFor("xmldb:exist:///db/apps/" + appName + "/repo.xml"));
 
-        if (repoXml != null) {
-            AppAuth auth = new AppAuth();
-            Element authElem = DOMUtil.getChildElementByLocalName(repoXml, "authentication");
-            if (authElem != null) {
-                if(authElem.hasAttribute("lifetime")){
-                    String s = authElem.getAttribute("lifetime");
-                    auth.setLifeTime(Integer.parseInt(s));
-                }
-                auth.setUrls(getWhitelistUrls(authElem));
-            } else {
-                return null;
-            }
+        if (repoXml == null) {
+	    return null;
+	}
 
-            Element mechanism = DOMUtil.getChildElementByLocalName(authElem, "mechanism");
-            if (mechanism != null) {
-                Element loginEndPoint = DOMUtil.getChildElementByLocalName(mechanism, "login-endpoint");
-                if (loginEndPoint != null) {
-                    auth.setLoginEndpoint(loginEndPoint.getTextContent());
-                    auth.setLoginFailed(loginEndPoint.getAttribute("redirect-on-fail"));
-                }
-                Element logoutEndpoint = DOMUtil.getChildElementByLocalName(mechanism, "logout-endpoint");
-                if (logoutEndpoint != null) {
-                    auth.setLogoutEndpoint(logoutEndpoint.getTextContent());
-                    if(logoutEndpoint.hasAttribute("redirect")){
-                        auth.setLogoutRedirect(logoutEndpoint.getAttribute("redirect"));
-                    }
-                }
-            }
-            RepoAuthCache.getInstance().setAuthInfo(appName, auth);
-            return auth;
-        }
-        return null;
+	AppAuth auth;
+	Element authElem = DOMUtil.getChildElementByLocalName(repoXml, "authentication");
+	if (authElem == null) {
+	    return null;
+	}
+
+	auth = new AppAuth();
+	if (authElem.hasAttribute("lifetime")) {
+	    String s = authElem.getAttribute("lifetime");
+	    auth.setLifeTime(Integer.parseInt(s));
+	}
+	auth.setUrls(getWhitelistUrls(authElem));
+
+	Element mechanism = DOMUtil.getChildElementByLocalName(authElem, "mechanism");
+	if (mechanism != null) {
+	    Element loginEndPoint = DOMUtil.getChildElementByLocalName(mechanism, "login-endpoint");
+	    if (loginEndPoint != null) {
+		auth.setLoginEndpoint(loginEndPoint.getTextContent());
+		auth.setLoginFailed(loginEndPoint.getAttribute("redirect-on-fail"));
+	    }
+	    Element logoutEndpoint = DOMUtil.getChildElementByLocalName(mechanism, "logout-endpoint");
+	    if (logoutEndpoint != null) {
+		auth.setLogoutEndpoint(logoutEndpoint.getTextContent());
+		if (logoutEndpoint.hasAttribute("redirect")) {
+		    auth.setLogoutRedirect(logoutEndpoint.getAttribute("redirect"));
+		}
+	    }
+	}
+        
+	RepoAuthCache.getInstance().setAuthInfo(appName, auth);
+	return auth;
     }
 
+    /* Parse the "allowed" element and create a list of URI strings that are
+     * whitelisted, so authentication gets bypassed for these URIs.
+     */
     private List getWhitelistUrls(Element authElem) {
         List allowed = new ArrayList();
         Element allowedElem = DOMUtil.getChildElementByLocalName(authElem, "allowed");
         if (allowedElem != null) {
-            //get uri elements and iterate them
+            // get uri elements and iterate them
             List<Element> list = DOMUtil.getChildElements(allowedElem);
             for (Element element : list) {
                 if (element.getLocalName().equals("uri")) {
