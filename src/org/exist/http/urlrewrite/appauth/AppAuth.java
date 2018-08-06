@@ -28,14 +28,13 @@ public class AppAuth {
 
     private String loginEndpoint = null;
     private String logoutEndpoint = null;
-    private String loginFailed = null;
-    private List urls = new ArrayList();
+    private String loginFailedEndpoint = null;
+    private String logoutRedirectEndpoint = null;
+    private List   whitelist = new ArrayList();
     private String userName = null;
-    private String logoutRedirect = null;
-    private int lifeTime =  900;  // defaults to 15min
+    private int    lifeTime =  900;  // defaults to 15min
 
-    public AppAuth() {
-    }
+    //public AppAuth() {}
 
     public String getLoginEndpoint() {
         return this.loginEndpoint;
@@ -43,8 +42,8 @@ public class AppAuth {
 
     public void setLoginEndpoint(String endPoint) {
         this.loginEndpoint = endPoint;
-        if (!this.urls.contains(endPoint)) {
-            this.urls.add(endPoint);
+        if (!this.whitelist.contains(endPoint)) {
+            this.whitelist.add(endPoint);
         }
     }
 
@@ -54,39 +53,39 @@ public class AppAuth {
 
     public void setLogoutEndpoint(String endPoint) {
         this.logoutEndpoint = endPoint;
-        if (!this.urls.contains(endPoint)) {
-            this.urls.add(endPoint);
+        if (!this.whitelist.contains(endPoint)) {
+            this.whitelist.add(endPoint);
         }
     }
 
     public String getLogoutRedirect(){
-        return this.logoutRedirect;
+        return this.logoutRedirectEndpoint;
     }
 
     public void setLogoutRedirect(String logoutRedirect) {
-        this.logoutRedirect = logoutRedirect;
-        if (!this.urls.contains(logoutRedirect)) {
-            this.urls.add(logoutRedirect);
+        this.logoutRedirectEndpoint = logoutRedirect;
+        if (!this.whitelist.contains(logoutRedirect)) {
+            this.whitelist.add(logoutRedirect);
         }
     }
 
     public String getLoginFailed() {
-        return this.loginFailed;
+        return this.loginFailedEndpoint;
     }
 
     public void setLoginFailed(String loginFailed) {
-        this.loginFailed = loginFailed;
-        if (!this.urls.contains(loginFailed)) {
-            this.urls.add(loginFailed);
+        this.loginFailedEndpoint = loginFailed;
+        if (!this.whitelist.contains(loginFailed)) {
+            this.whitelist.add(loginFailed);
         }
     }
 
     public void setUrls(List urls) {
-        this.urls = urls;
+        this.whitelist = urls;
     }
 
     public List getWhiteList() {
-        return this.urls;
+        return this.whitelist;
     }
 
     public int getLifeTime() {
