@@ -26,16 +26,15 @@ import java.util.List;
 public class AppAuth {
 
 
-    private String loginEndpoint;
-    private String logoutEndpoint;
-    private String loginFailed;
+    private String loginEndpoint = null;
+    private String logoutEndpoint = null;
+    private String loginFailed = null;
     private List urls = new ArrayList();
     private String userName = null;
-    private String logoutRedirect;
+    private String logoutRedirect = null;
     private int lifeTime =  900;  // defaults to 15min
 
     public AppAuth() {
-        loginEndpoint = null;
     }
 
     public String getLoginEndpoint() {
@@ -53,14 +52,21 @@ public class AppAuth {
         return this.logoutEndpoint;
     }
 
-    public String getLogoutRedirect(){
-        return this.logoutRedirect;
-    }
-
     public void setLogoutEndpoint(String endPoint) {
         this.logoutEndpoint = endPoint;
         if (!this.urls.contains(endPoint)) {
             this.urls.add(endPoint);
+        }
+    }
+
+    public String getLogoutRedirect(){
+        return this.logoutRedirect;
+    }
+
+    public void setLogoutRedirect(String logoutRedirect) {
+        this.logoutRedirect = logoutRedirect;
+        if (!this.urls.contains(logoutRedirect)) {
+            this.urls.add(logoutRedirect);
         }
     }
 
@@ -70,7 +76,7 @@ public class AppAuth {
 
     public void setLoginFailed(String loginFailed) {
         this.loginFailed = loginFailed;
-        if (this.urls.contains(loginFailed)) {
+        if (!this.urls.contains(loginFailed)) {
             this.urls.add(loginFailed);
         }
     }
@@ -83,20 +89,15 @@ public class AppAuth {
         return this.urls;
     }
 
-
-    public String getUserName() {
-        return userName;
-    }
-
-    public void setLogoutRedirect(String logoutRedirect) {
-        this.logoutRedirect = logoutRedirect;
-    }
-
     public int getLifeTime() {
         return this.lifeTime;
     }
 
     public void setLifeTime(int lifeTime) {
         this.lifeTime = lifeTime;
+    }
+
+    public String getUserName() {
+        return userName;
     }
 }
