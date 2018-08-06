@@ -84,10 +84,15 @@ public class AppAuthenticator {
 
             AppAuth auth = RepoAuthCache.getInstance().getAuthInfo(appName);
             if (auth == null) {
-                //try to get repo.xml
+		Logger.log("debug", "authenticate: auth cache is null");
+                // try to parse authentication element in repo.xml
+		// XXX this is performance punishment for old compat authentication
                 auth = initAppAuth(broker, appName);
-                //if there's none just return
-                if (auth == null) return user;
+                // if still null, fallback to old compat authentication
+                if (auth == null) {
+		    Logger.log("warning", "authenticate: fallback to old compat authentication");
+		    return user;
+		}
             }
 
             Subject subject = isTokenValid(request, broker, appName);
@@ -244,12 +249,14 @@ public class AppAuthenticator {
         Document repoXml = broker.getXMLResource(XmldbURI.xmldbUriFor("xmldb:exist:///db/apps/" + appName + "/repo.xml"));
 
         if (repoXml == null) {
+	    Logger.log("warning", "initAppAuth: repoXml is null");
 	    return null;
 	}
 
 	AppAuth auth;
 	Element authElem = DOMUtil.getChildElementByLocalName(repoXml, "authentication");
 	if (authElem == null) {
+	    Logger.log("info", "initAppAuth: no authentication element in repo.xml, fallback to compat behavior");
 	    return null;
 	}
 
