@@ -68,6 +68,8 @@ public class AppAuthenticator {
     * If no <authentication> Element is given in repo.xml this method just exists to allow backward-compatible
     * processing.
     *
+    * todo: review - logic is not right yet
+    *
     */
     public Subject authenticate(HttpServletRequest request,
                                 HttpServletResponse response,
@@ -98,7 +100,8 @@ public class AppAuthenticator {
                     UserAuth.getInstance().removeUserAuth(userName);
                     String logoutRedirect = auth.getLogoutRedirect();
                     response.setContentType("text/html");
-                    response.sendRedirect("/apps/" + appName + "/" + logoutRedirect);
+                    // todo: this needs generification in case an app is running on root
+                    response.sendRedirect(request.getContextPath() + "/apps/" + appName + "/" + logoutRedirect);
                 }
 
                 return subject;
