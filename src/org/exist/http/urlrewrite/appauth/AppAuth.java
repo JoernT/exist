@@ -80,7 +80,7 @@ public class AppAuth {
         }
     }
 
-    public void setUrls(List urls) {
+    public void setWhiteList(List urls) {
         this.whitelist = urls;
     }
 

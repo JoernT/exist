@@ -258,7 +258,7 @@ public class AppAuthenticator {
 	    String s = authElem.getAttribute("lifetime");
 	    auth.setLifeTime(Integer.parseInt(s));
 	}
-	auth.setUrls(getWhitelistUrls(authElem));
+	auth.setWhiteList(parseWhitelistUrls(authElem));
 
 	Element mechanism = DOMUtil.getChildElementByLocalName(authElem, "mechanism");
 	if (mechanism != null) {
@@ -283,7 +283,7 @@ public class AppAuthenticator {
     /* Parse the "allowed" element and create a list of URI strings that are
      * whitelisted, so authentication gets bypassed for these URIs.
      */
-    private List getWhitelistUrls(Element authElem) {
+    private List parseWhitelistUrls(Element authElem) {
         List allowed = new ArrayList();
         Element allowedElem = DOMUtil.getChildElementByLocalName(authElem, "allowed");
         if (allowedElem != null) {
