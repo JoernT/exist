@@ -56,10 +56,6 @@ import java.util.regex.PatternSyntaxException;
 public class AppAuthenticator {
     private static final String DEFAULT_COOKIE_NAME = "AppAuth";
 
-    private final String HMAC_KEY = "foobar";
-    private final String HMAC_ALG = "HmacSHA256";
-    private final String TOKEN_SEPARATOR = "|";
-
     /*
     * Authenticate the given user according to configuration given in the repo.xml of the requested app.
     *
@@ -162,8 +158,7 @@ public class AppAuthenticator {
     }
 
     private Subject isTokenValid(HttpServletRequest request, DBBroker broker, String appName) throws EXistException, AuthenticationException {
-        String username;
-        username = validateToken(getCookieValue(request), appName);
+        String username = AuthTokenFactory.getInstance().validateToken(getCookieValue(request), appName);
         if (username != null) {
             LoginDetails details = UserAuth.getInstance().fetchLoginDetails(username);
             //do login
@@ -215,12 +210,7 @@ public class AppAuthenticator {
     }
 
     private void setCookie(HttpServletResponse response, String username) {
-        //// TODO: create token
-        // username + expiry date
-//        String token = auth.createToken(username);
-        String token = createToken(username);
-//        String cookieName = auth.getCookieName();
-
+        String token = AuthTokenFactory.getInstance().createToken(username);
         Cookie cookie1 = new Cookie(DEFAULT_COOKIE_NAME, token);
         response.addCookie(cookie1);
     }
@@ -284,6 +274,7 @@ public class AppAuthenticator {
 	}
         
 	RepoAuthCache.getInstance().setAuthInfo(appName, auth);
+	AuthTokenFactory.getInstance().setLifetime(auth.getLifeTime());
 	return auth;
     }
 
@@ -317,75 +308,5 @@ public class AppAuthenticator {
             return null;
         }
     }
-
-
-    private String createToken(String username) {
-        try {
-            String hmac = calcHMAC(username);
-            return username + TOKEN_SEPARATOR + hmac;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    private String validateToken(String token, String appName) {
-        if (token == null) {
-            return null;
-        }
-        String hmac;
-        String[] fields;
-        try {
-            fields = token.split(Pattern.quote(TOKEN_SEPARATOR));
-            hmac = calcHMAC(fields[0]);
-        } catch (PatternSyntaxException | UnsupportedEncodingException | NoSuchAlgorithmException | InvalidKeyException e) {
-            e.printStackTrace();
-            return null; //todo: check: shouldn't we return null in case the token cannot be parsed or calculated?
-        }
-
-        UserAuth userAuth = UserAuth.getInstance();
-        LoginDetails details = userAuth.fetchLoginDetails(fields[0]);
-        if (details == null) {
-            //we might run here in case there's an old cookie containing a parseable token
-            return null;
-        }
-
-        long now = Instant.now().getEpochSecond();
-        long lastAccessed = details.getLastAccessed(appName);
-
-        AppAuth auth = RepoAuthCache.getInstance().getAuthInfo(appName);
-
-//        if (hmac.equals(fields[1]) && now < lastAccessed + tokenLifetime) {
-        if (hmac.equals(fields[1]) && now < lastAccessed + auth.getLifeTime()) {
-            details.updateLastAccessed(appName);
-            return fields[0];
-        } else {
-            return null;
-        }
-    }
-
-    private String calcHMAC(String username) throws UnsupportedEncodingException, NoSuchAlgorithmException, InvalidKeyException {
-//        String tokdata = username + TOKEN_SEPARATOR + tstamp;
-
-        try {
-            Mac hmac = Mac.getInstance(HMAC_ALG);
-            byte[] byteKey = HMAC_KEY.getBytes("ASCII");
-            SecretKeySpec keySpec = new SecretKeySpec(byteKey, HMAC_ALG);
-            hmac.init(keySpec);
-            byte[] hmac_data = hmac.doFinal(username.getBytes("UTF-8"));
-            Formatter formatter = new Formatter();
-            for (byte b : hmac_data) {
-                formatter.format("%02x", b);
-            }
-            return formatter.toString();
-        } catch (UnsupportedEncodingException | NoSuchAlgorithmException |
-                InvalidKeyException e) {
-            throw e;
-        }
-
-    }
-
-
-
 
 }
