@@ -191,18 +191,26 @@ public class AppAuthenticator {
         return null;
     }
 
+    /* This method is called in two cases:
+     * - after the user has entered username/password into a login form, fetch
+     *   username/password parameters and login to eXist;
+     * - if no username parameter present, user's browser gets redirected to a
+     *   login form page.
+     * XXX consider splitting into separate methods for clarity
+     */
     private Subject performLogin(HttpServletRequest request, HttpServletResponse response, DBBroker broker, ServletConfig config) throws ServletException, IOException {
+
         String appName = getAppNameFromRequest(request);
         String loginPage = RepoAuthCache.getInstance().getAuthInfo(appName).getLoginEndpoint();
-
         Subject subject;
 
-        //try to get username
+        // try to get username and password parameters
         String username = request.getParameter("user");
         String pass = request.getParameter("password");
 
         if (username == null) {
-            //redirect to login endpoint
+	    Logger.log("debug", "performLogin: redirect to login page");
+            // redirect to login endpoint
             response.setContentType("text/html");
             RequestDispatcher dispatcher = config.getServletContext().getRequestDispatcher("/apps/" + appName + "/" + loginPage);
             dispatcher.forward(request, response);
@@ -210,14 +218,18 @@ public class AppAuthenticator {
         } else {
             // login attempt if username is given
             try {
+		Logger.log("debug", "performLogin: trying to login");
                 // authenticate with eXistdb
                 subject = login(username, pass, broker);
+		Logger.log("info", "performLogin: successful login, user "+username);
                 UserAuth.getInstance().registerUserDetails(username, pass, appName);
                 setCookie(response, subject.getName());
                 return subject;
             } catch (EXistException e) {
+		Logger.log("notice", "performLogin: error logging in user "+username+": "+e.getMessage());
                 throw new ServletException(e);
             } catch (AuthenticationException e) {
+		Logger.log("notice", "performLogin: failed login, user "+username+": "+e.getMessage());
                 //future todo: login counter?
                 String loginFailed = RepoAuthCache.getInstance().getAuthInfo(appName).getLoginFailed();
                 response.setContentType("text/html");
@@ -233,7 +245,6 @@ public class AppAuthenticator {
         Cookie cookie1 = new Cookie(DEFAULT_COOKIE_NAME, token);
         response.addCookie(cookie1);
     }
-
 
     private Subject login(final String user, final String pass, DBBroker broker) throws EXistException, AuthenticationException {
         final SecurityManager sm = BrokerPool.getInstance().getSecurityManager();
