@@ -179,7 +179,7 @@ public class AppAuthenticator {
 	    Logger.log("debug", "token is valid");
             LoginDetails details = UserAuth.getInstance().getUserDetails(username);
             // do login
-            return login(username, details.getPass(), broker);
+            return existdbLogin(username, details.getPass(), broker);
 
         } else {
 	    Logger.log("notice", "token is INVALID");
@@ -220,7 +220,7 @@ public class AppAuthenticator {
             try {
 		Logger.log("debug", "performLogin: trying to login");
                 // authenticate with eXistdb
-                subject = login(username, pass, broker);
+                subject = existdbLogin(username, pass, broker);
 		Logger.log("info", "performLogin: successful login, user "+username);
                 UserAuth.getInstance().registerUserDetails(username, pass, appName);
                 setCookie(response, subject.getName());
@@ -246,7 +246,7 @@ public class AppAuthenticator {
         response.addCookie(cookie1);
     }
 
-    private Subject login(final String user, final String pass, DBBroker broker) throws EXistException, AuthenticationException {
+    private Subject existdbLogin(final String user, final String pass, DBBroker broker) throws EXistException, AuthenticationException {
         final SecurityManager sm = BrokerPool.getInstance().getSecurityManager();
         final Subject subject = sm.authenticate(user, pass);
 //        broker.popSubject();
