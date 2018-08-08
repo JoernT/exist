@@ -52,6 +52,6 @@ public class UserAuth {
     }
 
     public void removeUserAuth(String username) {
-        users.remove(username);
+        this.users.remove(username);
     }
 }

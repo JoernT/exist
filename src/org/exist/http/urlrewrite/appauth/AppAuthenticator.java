@@ -157,14 +157,17 @@ public class AppAuthenticator {
         return null;
     }
 
+    /* Fetch auth token from HTTP cookie, login user if token valid. */
     private Subject isTokenValid(HttpServletRequest request, DBBroker broker, String appName) throws EXistException, AuthenticationException {
+	// username=null if token cannot be validated
         String username = AuthTokenFactory.getInstance().validateToken(getCookieValue(request), appName);
         if (username != null) {
             LoginDetails details = UserAuth.getInstance().fetchLoginDetails(username);
             //do login
             return login(username, details.getPass(), broker);
 
-        }else{
+        } else {
+	    // XXX what is this for? logout?
             //todo: username is always null
             UserAuth.getInstance().removeUserAuth(username);
         }
