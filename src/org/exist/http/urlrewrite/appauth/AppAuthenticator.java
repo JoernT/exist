@@ -98,7 +98,7 @@ public class AppAuthenticator {
                 String logout = auth.getLogoutEndpoint();
                 if (requestPath.endsWith(logout)) {
                     String userName = subject.getName();
-                    UserAuth.getInstance().removeUserAuth(userName);
+                    UserAuth.getInstance().removeUserDetails(userName);
                     String logoutRedirect = auth.getLogoutRedirect();
                     response.setContentType("text/html");
                     // todo: this needs generification in case an app is running on root
@@ -162,14 +162,14 @@ public class AppAuthenticator {
 	// username=null if token cannot be validated
         String username = AuthTokenFactory.getInstance().validateToken(getCookieValue(request), appName);
         if (username != null) {
-            LoginDetails details = UserAuth.getInstance().fetchLoginDetails(username);
+            LoginDetails details = UserAuth.getInstance().getUserDetails(username);
             //do login
             return login(username, details.getPass(), broker);
 
         } else {
 	    // XXX what is this for? logout?
             //todo: username is always null
-            UserAuth.getInstance().removeUserAuth(username);
+            UserAuth.getInstance().removeUserDetails(username);
         }
 
         return null;
@@ -196,7 +196,7 @@ public class AppAuthenticator {
             try {
                 // authenticate with eXistdb
                 subject = login(username, pass, broker);
-                UserAuth.getInstance().registerUser(username, pass, appName);
+                UserAuth.getInstance().registerUserDetails(username, pass, appName);
                 setCookie(response, subject.getName());
                 return subject;
             } catch (EXistException e) {

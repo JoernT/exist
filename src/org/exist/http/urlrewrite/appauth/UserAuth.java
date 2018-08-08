@@ -42,16 +42,16 @@ public class UserAuth {
         return instance;
     }
 
-    public void registerUser(String user, String password, String appName) {
+    public void registerUserDetails(String user, String password, String appName) {
         LoginDetails details = new LoginDetails(appName, password);
         this.users.put(user, details);
     }
 
-    public LoginDetails fetchLoginDetails(String username) {
+    public LoginDetails getUserDetails(String username) {
         return (LoginDetails) this.users.get(username);
     }
 
-    public void removeUserAuth(String username) {
+    public void removeUserDetails(String username) {
         this.users.remove(username);
     }
 }
