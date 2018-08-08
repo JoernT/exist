@@ -23,19 +23,18 @@ package org.exist.http.urlrewrite.appauth;
 import java.time.Instant;
 import java.util.HashMap;
 
+/* This is a data container class, holding the user password and per-app
+ * last login times. This instance is assigned to a username in
+ * UserAuth:registerUserDetails()
+ */
 public class LoginDetails {
 
-//    private String user = null;
     private String pass = null;
-//    private long lastAccessed = 0;
     private HashMap lastAccessed = new HashMap();
 
-//    public LoginDetails(String user, String pass){
     public LoginDetails(String appName, String pass){
-//        this.user = user;
         this.pass = pass;
         this.lastAccessed.put(appName, Instant.now().getEpochSecond());
-//        this.lastAccessed = Instant.now().getEpochSecond();;
     }
 
 
@@ -49,6 +48,5 @@ public class LoginDetails {
 
     public void updateLastAccessed(String appName){
         this.lastAccessed.put(appName, Instant.now().getEpochSecond());
-//        this.lastAccessed = Instant.now().getEpochSecond();
     }
 }
