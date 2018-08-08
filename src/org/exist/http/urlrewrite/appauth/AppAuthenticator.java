@@ -93,10 +93,12 @@ public class AppAuthenticator {
 
             Subject subject = isTokenValid(request, broker, appName);
             if (subject != null) {
+		Logger.log("debug", "authenticate: got valid token");
 
-                //check for a logout
+                // check for a logout
                 String logout = auth.getLogoutEndpoint();
                 if (requestPath.endsWith(logout)) {
+		    Logger.log("debug", "authenticate: logout");
                     String userName = subject.getName();
                     UserAuth.getInstance().removeUserDetails(userName);
                     String logoutRedirect = auth.getLogoutRedirect();
@@ -105,18 +107,24 @@ public class AppAuthenticator {
                     response.sendRedirect(request.getContextPath() + "/apps/" + appName + "/" + logoutRedirect);
                 }
 
+		// return from authenticate() since we have a valid token
+		Logger.log("debug", "authenticate: grant token authenticated access to "+requestPath);
                 return subject;
             }
 
+	    // if no valid token and URI requires auth, perform login
             if (isProtected(auth, requestPath)) {
+		Logger.log("debug", "authenticate: perform login for access to "+requestPath);
                 return performLogin(request, response, broker, config);
             }
 
+	}  // end try
 
-        }
-
-        return user; //default to returning the user that was passed in (usually guest)
-
+	// if we came here, there was no valid token and the URI does not
+	// require authentication. Return the user that was passed in (usually
+	// guest) for unauthenticated access.
+	Logger.log("debug", "authenticate: grant unauth access to "+requestPath);
+        return user;
     }
 
     /**
@@ -129,21 +137,26 @@ public class AppAuthenticator {
      */
     private boolean isProtected(AppAuth auth, String requestPath) {
 
-        if (auth != null) {
-            List urls = auth.getWhiteList();
-            for (Object url1 : urls) {
-                String url = (String) url1;
-                //todo: refine - just checking if requestURI ends with a whitelisted item - apply some regex (glob support)?
-                if (requestPath.endsWith(url)) {
-                    return false; //url is whitelisted
-                }
-            }
-            return true;
-        }
-        // if there's no AppAuth
-        return false;
+        if (auth == null) {
+	    Logger.log("debug", "isProtected: no AppAuth");
+	    return false;
+	} 
+
+	List urls = auth.getWhiteList();
+	for (Object url1 : urls) {
+	    String url = (String) url1;
+	    //todo: refine - just checking if requestURI ends with a whitelisted item - apply some regex (glob support)?
+	    if (requestPath.endsWith(url)) {
+		Logger.log("debug", "isProtected: whitelisted: "+requestPath);
+		return false;
+	    }
+	}
+	// if URI not found in whitelist, it is a protected ressource
+	Logger.log("debug", "isProtected: protected: "+requestPath);
+	return true;
     }
 
+    /* fetch AppAuth cookie which contains the auth token */
     private String getCookieValue(HttpServletRequest request){
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
@@ -159,14 +172,17 @@ public class AppAuthenticator {
 
     /* Fetch auth token from HTTP cookie, login user if token valid. */
     private Subject isTokenValid(HttpServletRequest request, DBBroker broker, String appName) throws EXistException, AuthenticationException {
+
 	// username=null if token cannot be validated
         String username = AuthTokenFactory.getInstance().validateToken(getCookieValue(request), appName);
         if (username != null) {
+	    Logger.log("debug", "token is valid");
             LoginDetails details = UserAuth.getInstance().getUserDetails(username);
-            //do login
+            // do login
             return login(username, details.getPass(), broker);
 
         } else {
+	    Logger.log("notice", "token is INVALID");
 	    // XXX what is this for? logout?
             //todo: username is always null
             UserAuth.getInstance().removeUserDetails(username);
