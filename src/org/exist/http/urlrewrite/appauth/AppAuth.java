@@ -23,15 +23,17 @@ package org.exist.http.urlrewrite.appauth;
 import java.util.ArrayList;
 import java.util.List;
 
+/* This is a data container that caches app specific authentication information
+ * that gets parsed (once) out of the repo.xml file of an app. Data gets filled
+ * from AppAuthenticator:initAppAuth() using setter methods.
+ */
 public class AppAuth {
-
 
     private String loginEndpoint = null;
     private String logoutEndpoint = null;
     private String loginFailedEndpoint = null;
     private String logoutRedirectEndpoint = null;
     private List   whitelist = new ArrayList();
-    private String userName = null;
     private int    lifeTime =  900;  // defaults to 15min
 
     //public AppAuth() {}
@@ -94,9 +96,5 @@ public class AppAuth {
 
     public void setLifeTime(int lifeTime) {
         this.lifeTime = lifeTime;
-    }
-
-    public String getUserName() {
-        return userName;
     }
 }
