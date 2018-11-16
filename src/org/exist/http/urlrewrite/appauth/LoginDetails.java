@@ -26,6 +26,8 @@ import java.util.HashMap;
 /* This is a data container class, holding the user password and per-app
  * last login times. This instance is assigned to a username in
  * UserAuth:registerUserDetails()
+ *
+ * todo: implement expiry for Logindetails so they don't pile up in case users delete their cookies
  */
 public class LoginDetails {
 

@@ -55,12 +55,8 @@
 
 package org.exist.http.urlrewrite.appauth;
 
-import java.io.FileNotFoundException;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Formatter;
 import java.util.regex.Pattern;
@@ -77,74 +73,20 @@ class AuthTokenFactory {
     private static Mac hmac = null;
     private static boolean initialized = false;
     private static String HMAC_KEYFILE = "/tmp/testkey";
-    private static String HMAC_ALG = "HmacSHA128";
-    private static String TOKEN_SEPARATOR = "|";
-    private static int TOKEN_LIFETIME  = 300;  // 5min
+    private static String HMAC_ALG = "HmacSHA256";
+    public static String TOKEN_SEPARATOR = "|";
+    private static int TOKEN_LIFETIME = 300;  // 5min
 
     private AuthTokenFactory() {
-	initialized = initCrypto();
-    }
-
-    private boolean initCrypto() {
-	// try to read HMAC keyfile
-	try {
-	    ObjectInputStream oin = new ObjectInputStream(new FileInputStream(HMAC_KEYFILE));
-	    try {
-		key = (SecretKey) oin.readObject();
-	    } finally {
-		oin.close();
-	    }
-	} catch (FileNotFoundException e) {
-	    Logger.log("notice", "no HMAC keyfile found");
-	    // no problem, move on
-	} catch (Exception e) {
-	    Logger.log("error", "ERROR: HMAC keyfile is corrupt: "+e.getMessage());
-	    e.printStackTrace();
-	    return false;
-	}
-
-	// create new keyfile if needed
-	if (key != null) {
-	    Logger.log("debug", "HMAC key was read from keyfile");
-	} else {
-	    Logger.log("notice", "creating new HMAC keyfile");
-	    try {
-		// Generate secret key for HmacSHA256
-		key = KeyGenerator.getInstance(HMAC_ALG).generateKey();
-
-		// write key to HMAC keyfile
-		ObjectOutputStream oout = new ObjectOutputStream(new FileOutputStream(HMAC_KEYFILE));
-		try {
-		    oout.writeObject(key);
-		} finally {
-		    oout.close();
-		}
-	    } catch (Exception e) {
-		Logger.log("error", "ERROR: failed to create HMAC key file: "+e.getMessage());
-		e.printStackTrace();
-		return false;
-	    }
-	}
-
-	// init HMAC object
-	try {
-	    hmac = Mac.getInstance(HMAC_ALG);
-	    hmac.init(key);
-	} catch (Exception e) {
-	    Logger.log("error", "ERROR: failed to initialize HMAC crypto: "+e.getMessage());
-	    e.printStackTrace();
-	    return false;
-	}
-
-	return true;
+        initialized = initCrypto();
     }
 
     public static void setLifetime(int ltime) {
-	TOKEN_LIFETIME  = ltime;
+        TOKEN_LIFETIME = ltime;
     }
 
     public static boolean isInitialized() {
-	return initialized;
+        return initialized;
     }
 
     public static AuthTokenFactory getInstance() {
@@ -158,52 +100,124 @@ class AuthTokenFactory {
         return instance;
     }
 
+    private boolean initCrypto() {
+        // try to read HMAC keyfile
+        try {
+            ObjectInputStream oin = new ObjectInputStream(new FileInputStream(HMAC_KEYFILE));
+            try {
+                key = (SecretKey) oin.readObject();
+            } finally {
+                oin.close();
+            }
+        } catch (FileNotFoundException e) {
+            Logger.log("notice", "no HMAC keyfile found");
+            // no problem, move on
+        } catch (Exception e) {
+            Logger.log("error", "ERROR: HMAC keyfile is corrupt: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+
+        // create new keyfile if needed
+        if (key != null) {
+            Logger.log("debug", "HMAC key was read from keyfile");
+        } else {
+            Logger.log("notice", "creating new HMAC keyfile");
+            try {
+                // Generate secret key for HmacSHA256
+                key = KeyGenerator.getInstance(HMAC_ALG).generateKey();
+
+                // write key to HMAC keyfile
+                ObjectOutputStream oout = new ObjectOutputStream(new FileOutputStream(HMAC_KEYFILE));
+                try {
+                    oout.writeObject(key);
+                } finally {
+                    oout.close();
+                }
+            } catch (NoSuchAlgorithmException e) {
+                Logger.log("error", "ERROR: failed to create HMAC key file: " + e.getMessage());
+                e.printStackTrace();
+                return false;
+            } catch (FileNotFoundException e) {
+                Logger.log("error", "ERROR: failed to find HMAC key file: " + e.getMessage());
+                e.printStackTrace();
+                return false;
+            } catch (IOException e) {
+                Logger.log("error", "ERROR: IOException while accessing keyfile: " + e.getMessage());
+                e.printStackTrace();
+                return false;
+            }
+        }
+
+        // init HMAC object
+        try {
+            hmac = Mac.getInstance(HMAC_ALG);
+            hmac.init(key);
+        } catch (Exception e) {
+            Logger.log("error", "ERROR: failed to initialize HMAC crypto: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+
+        return true;
+    }
+
     public String createToken(String username) {
-	long expires = Instant.now().getEpochSecond() + TOKEN_LIFETIME;
-	try {
-	    String hmac = calcHMAC(username, expires);
-	} catch (Exception e) {
-	    e.printStackTrace();
-	    return null;
-	}
-	return username + TOKEN_SEPARATOR + expires + TOKEN_SEPARATOR + hmac;
+        long expires = Instant.now().getEpochSecond() + TOKEN_LIFETIME;
+        String hmac = new String();
+        try {
+            hmac = calcHMAC(username, expires);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+        return username + TOKEN_SEPARATOR + expires + TOKEN_SEPARATOR + hmac;
     }
 
     public String validateToken(String token, String appname) {
-	String[] fields;
-	String hmac = null;
-	long expires = 0;
-	try {
-	    fields = token.split(Pattern.quote(TOKEN_SEPARATOR));
-	    expires = Long.parseLong(fields[1]);
-	    hmac = calcHMAC(fields[0], expires);
-	} catch (Exception e) {
-	    e.printStackTrace();
-	    return null;
-	}
-	long now = Instant.now().getEpochSecond();
-	if (hmac == fields[2] && now <= expires) {
-	    return fields[0];
-	} else {
-	    return null;
-	}
+        String[] fields;
+        String hmac = null;
+        long expires = 0;
+        if(token == null){return null;}
+        fields = getFields(token);
+        expires = Long.parseLong(fields[1]);
+        try {
+            hmac = calcHMAC(fields[0], expires);
+        } catch (UnsupportedEncodingException e) {
+            Logger.log("error", "ERROR: UnsupportedEncoding for hmac: " + e.getMessage());
+            return null;
+        }
+        long now = Instant.now().getEpochSecond();
+        if (hmac.equals(fields[2]) && now <= expires) {
+            //field[0] is the username which is returned here
+            return fields[0];
+        } else {
+            return null;
+        }
+    }
+
+    public String[] getFields(String token) {
+        String[] fields;
+        fields = token.split(Pattern.quote(TOKEN_SEPARATOR));
+        return fields;
     }
 
     private String calcHMAC(String username, long tstamp) throws UnsupportedEncodingException {
-	String tokdata = username + TOKEN_SEPARATOR + tstamp;
-	byte[] hmac_data;
+        String tokdata = username + TOKEN_SEPARATOR + tstamp;
+        byte[] hmac_data;
 
-	try {
-	    hmac_data = hmac.doFinal(tokdata.getBytes("UTF-8"));
-	} catch (Exception e) {
-	    throw e;
-	}
+        try {
+            hmac_data = hmac.doFinal(tokdata.getBytes("UTF-8"));
+        } catch (Exception e) {
+            throw e;
+        }
 
-	Formatter formatter = new Formatter();
-	for (byte b : hmac_data) {
-	    formatter.format("%02x", b);
-	}
-	return formatter.toString();
+        Formatter formatter = new Formatter();
+        for (byte b : hmac_data) {
+            formatter.format("%02x", b);
+        }
+        String f = formatter.toString();
+        return f;
     }
 
 }

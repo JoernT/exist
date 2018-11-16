@@ -52,6 +52,8 @@ public class UserAuth {
     }
 
     public void removeUserDetails(String username) {
-        this.users.remove(username);
+        if(this.users.get(username) != null){
+            this.users.remove(username);
+        }
     }
 }
