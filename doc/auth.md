@@ -9,9 +9,14 @@ One of the most important parts of an eXist-db application is the controller (co
 
 However to achieve authentication the developer of an app has to include the login module which authenticates the user against the database to allow access to protected resources.
 
-Further the developer has to make sure that a login page is presented if the user is not logged in already. All URL patterns that shall be protected need an explicit call to login:set-user function to trigger the login to the database. The result of that operation must then be checked and either forward to the requested URL (if logged in) or forward to a login page.
+Further the developer has to make sure that a login page is presented if the user is not logged in already. All URL patterns that shall be protected 
+need an explicit call to login:set-user function to trigger the login to the database. The result of that operation must then be checked and either 
+forwarded to the requested URL (if logged in) or to a login page.
 
-All in all a lot of room for mistakes. During my own efforts in building applications i struggled with this rather basic task over and over again eating up time that i should have spent on implementing features for the customer. While setting up a proper authentication should be a matter of minutes i ended up spending whole days until i got it working cleanly. Clearly a candidate for improvement.
+All in all a lot of room for mistakes. During my own efforts in building applications i struggled with this rather basic
+task over and over again eating up time that i should have spent on implementing features for the customer. While setting
+up a proper authentication should be a matter of minutes i ended up spending whole days until i got it working cleanly.
+Clearly a candidate for improvement.
 
 Another consequence of this current architecture is the fact that the controller.xql must always be public readable and executable. This certainly shouldn't be the case for apps where you require an authenticated login for all functionalities.
 
@@ -26,7 +31,7 @@ The control flow is as follows:
 
 1. a request reaches XQueryURLRewrite servlet. This is configured to handle all incoming requests
 2. in the 'service' method a default (unpriviledged) guest user is created
-3. the controller will be configured and executed with that guest user
+3. the controller of the requested application will be configured and executed with that guest user
 4. if the request matches a protected resource the controller must call login:set-user which will execute the actual login to the database.  In case of success this will return an privileged user. If the login fails for some reason the controller must forward the request to the login page.
 5. excecution of the actual request takes place
 
@@ -34,7 +39,11 @@ Problem: the developer is fully responsible to handle the whole process starting
 
 ## The new approach
 
-The new approach is based on the idea that the developer shouldn't be responsible for handling the actual authentication procedure. Instead the XQueryURLRewrite already handles this before the controller is called. As a result of successful authentication the variable 'exist:user' will be made available in controller.xql to allow for further authorization.
+The new approach is based on the idea that the developer shouldn't be responsible for handling the actual authentication procedure. 
+Instead the XQueryURLRewrite already handles this before the controller is called. As a result of successful authentication 
+the variable 'exist:user' will be made available in controller.xql to allow for further authorization.
+
+> Authorization is always determined by the requirements of an application and must be dealt with by the developers. 
 
 The following diagram shows the new control flow:
 
@@ -46,9 +55,14 @@ The new approach changes the flow to:
 
 1. a request reaches XQueryURLRewrite servlet. This is configured to handle all incoming requests
 2. the new AppAuthenticator will check if the requested resource is protected (see below)
-3. if yes a database login is attempted. In case of success the username will be passed to the controller as an external variable called $exist:user. This may then be used to check authorization for the given user. In case of failure the request is sent to the login procedure.
+3. if yes a database login is attempted. In case of success the username will be passed to the controller 
+as an external variable called $exist:user.
+In case of failure the request is sent to the login endpoint.
 
-As a consequence the developer does not need to worry about authentication any more but can rely on the fact that an $exist:user will always be set. Authorization however is always application-specific and must be handled within the controller. But with the user always been given as var it is now easy to use the common XQuery function to e.g. check for a certain user group.
+As a consequence the developer does not need to worry about authentication any more but can rely on the fact that an
+ $exist:user will always be set. Authorization however is always application-specific and must be handled within the
+  controller. But with the user always been given as var it is now easy to use the common XQuery function to e.g.
+   check for a certain user group.
 
 ## Setup the authentication
 
@@ -59,8 +73,7 @@ Some additional markup in repo.xml enables the developer to setup authentication
         <token lifetime="300" separator="|" alg="HmacSHA256" cookie-name="RepoAuth"/>
         <mechanism name="builtin">
             <login-endpoint>login.html</login-endpoint>
-            <logout-endpoint>index.html?logout=true</logout-endpoint>
-            <login-fail>login.html?failed=true</login-fail>
+            <logout-endpoint redirect="index.html?logout=true">/logout</logout-endpoint>
         </mechanism>
         <!-- ### alternative mechanism ###
         <mechanism name="SAML">
@@ -75,32 +88,54 @@ Some additional markup in repo.xml enables the developer to setup authentication
     </authentication>
 ```
 
-For most elements here there will be defaults when the respective element is not present. The new approach uses a whitelist approach - only URLs that are listed under ```<allowed>``` are passed along without authentication. For each URL that is not present there the login endpoint will be called to either present a login form or use other means to login the user. As the mechanism endpoints must be publicly available these are added to the whitelist automatically.
+For most elements here there will be defaults when the respective element is not present.
+The new approach uses a whitelist approach - only URLs that are listed under ```<allowed>``` are passed along without
+authentication. For each URL that is not present there the login endpoint will be called to either present a login
+form or use other means to login the user. As the mechanism endpoints must be publicly available these are added to
+the whitelist automatically.
 
-The default mechanism is a simple login.html form but others can be plugged (see commented entry for SAML).
+The default mechanism is a simple login.html form but others can be plugged (see commented entry for SAML) later on as
+implementations become available.
+
+### Whitelisting versus Blacklisting
+
+Whitelisting is generally considered more secure as it considers all resources as protected by default. This makes it
+much less likely that resources are exposed to the public by error (misconfiguration).
 
 ## State of implementation
 
-The implementation is still in a proof-of-concept state and not publicly available in the eXist-db codebase. The first release will also only provide the 'builtin' mechanism which uses a login form. However this is a very common case for eXist-db apps and should be sufficient to confirm the usefulness of the new approach.
-Once the concept has been approved it is planned to add more mechanisms such as SAML.
+The current status of the implementation is that of a successful proof-of-concept which certainly needs some more
+testing. However the code should be stable enough to make it into production without much further changes. 
+
+For a first testing phase it won't yet be available directly from exist-db repository but still lives in my own fork.
+
+The first release will also only provide the 'builtin' mechanism which uses a login form. 
+However this is a very common case for eXist-db apps and should be sufficient to confirm the usefulness of the new approach.
+Once the concept has been approved it is planned to add more mechanisms such as SAML or OAuth.
 
 ## Compatibility
 
 The new mechanism is opt-in and fully backward compatible with existing applications that may continue to use the old login module.
 
-That means that only if you provide an ```<authentication>``` element in repo.xml the AppAuthenticator will be executed - if that element is not present the app will be processed just as before.
+That means that only if you provide an ```<authentication>``` element in repo.xml the AppAuthenticator will be
+executed - if that element is not present the app will be processed just as before.
 
 ## Current limitations
 
 The current design builds on the following assumptions:
 
 1. the majority of apps is using a login form
-1. a single authorisation token for all apps is sufficient
+1. a single authentication token for all apps is sufficient
+1. AppAuthenticator needs to determine the application name from the request. Current implementation is not considering
+the case that an app runs in root context or reconfigures the default request path of '/exist/apps/'. This still must
+be improved before an production rollout.
 
 
 ### Default login mechanism
 
-The default mechanism which we implemented for AppAuthenticator is 'builtin' which means to use a login.html file for authenticating users (which of course should be protected by a SSL connection). We assume that this covers the big majority of eXist-db apps and therefore was chosen as first target. But of course the idea is to support several mechanisms here and SAML will be next to be pluggable here.
+The default mechanism which we implemented for AppAuthenticator is 'builtin' which means to use a login.html file for
+authenticating users (which of course should be protected by a SSL connection). We assume that this covers the big
+ majority of eXist-db apps and therefore was chosen as first target. But of course the idea is to support several mechanisms here and SAML will be next to be pluggable here.
 
 ### Single sign-on
 
@@ -109,3 +144,11 @@ It's still a bit of an open questions if this is a limitation or a feature.
 The current implementation authenticates users by setting a token which identifies the user against the database. This token is valid for all applications which means: if you're authenticated for one app you're authenticated for all others. When logging out of one app you'll be logged out for all apps.
 
 While we're aware that there's a concept of app domains we actually couldn't think of a use case where this will be needed - in the current implementation a user is authenticated once however it is a different question which actual rights for certain resources apply. This should be handled on the authorization level (controller.xql) by checking membership in certain groups.
+
+## Reference app
+
+For testing and documentation purposes there's a eXist-db app called 'existdb-login' that may act as a blueprint
+for application developers. It shows a very simple working setup with one public and one protected page. By studying
+the controller.xql and repo.xml it will be very easy to setup your own descriptive app authentication.
+
+ 
