@@ -1,6 +1,6 @@
 /*
  * eXist Open Source Native XML Database
- * Copyright (C) 2001-2018 The eXist Project
+ * Copyright (C) 2001-2019 The eXist Project
  * http://exist-db.org
  *
  * This program is free software; you can redistribute it and/or
@@ -18,37 +18,9 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-package org.exist.exform;
+package org.exist.fore.model;
 
-import org.exist.exform.exception.FormException;
-import org.w3c.dom.Node;
+public interface States {
 
-/**
- *
- * author: joern turner
- */
-public interface FormProcessor {
-
-    /**
-     * set the XForms to process. A complete host document embedding XForms syntax (e.g. html/xforms)
-     * is expected as input.
-     *
-     * @param node a DOM Node containing the XForms
-     */
-    void setXForms(Node node) throws FormException;
-
-    /**
-     * fire up form processing.
-     *
-     * @throws FormException
-     */
-    void init() throws FormException;
-
-    /**
-     * Terminates the form processing. Should perform resource cleanup.
-     *
-     * @throws FormException if an error occurred during shutdown.
-     */
-
-    void shutdown() throws FormException;
+    Object serializeStates(Model model);
 }
