@@ -19,6 +19,9 @@
     <option name="pathToUserRulesConfiguration" value="" />
     <option name="pathToJarWithRules" value="" />
   </component>
+  <component name="ExcludeFromValidation">
+    <file url="file://$PROJECT_DIR$/src/org/exist/fore/xforms/XFormsElement.java" />
+  </component>
   <component name="FindBugsConfigurable">
     <option name="make" value="true" />
     <option name="effort" value="default" />
