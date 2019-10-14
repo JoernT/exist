@@ -6,9 +6,12 @@
 package org.exist.fore.model;
 
 
+import net.sf.saxon.Configuration;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.exist.fore.Initializer;
 import org.exist.fore.XFormsException;
+import org.exist.fore.model.bind.Bind;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -27,6 +30,11 @@ public class Model {
     private final static Logger LOGGER = LogManager.getLogger(Model.class);
     private final Element element;
     private List instances;
+    private List modelBindings;
+    private final Configuration fConfiguration = new Configuration();
+
+
+
 
     /**
      * Creates a new Model object.
@@ -89,7 +97,7 @@ public class Model {
 
         // todo: initialize p3p ?
         // initialize binds and submissions (actions should be initialized already)
-//        Initializer.initializeBindElements(this, this.element, new SaxonReferenceFinderImpl());
+        Initializer.initializeBindElements(this, this.element);
 //        Initializer.initializeActionElements(this, this.element);
 //        Initializer.initializeSubmissionElements(this, this.element);
 
@@ -179,6 +187,26 @@ public class Model {
     }
 
     /**
+     * adds a Bind object to this Model
+     *
+     * @param bind the Bind object to add
+     */
+    public void addBindElement(Bind bind) {
+        if (this.modelBindings == null) {
+            this.modelBindings = new ArrayList();
+        }
+
+        this.modelBindings.add(bind);
+    }
+
+
+    public Configuration getConfiguration() {
+        return fConfiguration;
+    }
+
+
+
+    /**
      * @return
      */
     private List<Element> getAllInstanceElements() {
@@ -205,8 +233,9 @@ public class Model {
     }
 
 
-
-
+    public List getModelBindings() {
+        return modelBindings;
+    }
 }
 
 // end of class

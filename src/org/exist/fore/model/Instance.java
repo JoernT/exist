@@ -16,7 +16,6 @@ import org.w3c.dom.Node;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import java.util.List;
 
 /**
  * Implementation of XForms instance Element.
@@ -61,7 +60,16 @@ public class Instance {
         if(this.element.getAttribute("id").equals("")){
             this.element.setAttribute("id","default");
         }
+        storeUserObjects();
+
 //        initXPathContext();
+    }
+
+    private void storeUserObjects() {
+        if(instanceDocument.getDocumentElement() != null){
+            instanceDocument.getDocumentElement().setUserData("model",this.model,null);
+            instanceDocument.getDocumentElement().setUserData("instance",this,null);
+        }
     }
 
     private Element createInitialInstance() {
