@@ -5,7 +5,7 @@
 
 package org.exist.fore.xpath;
 
-import org.exist.fore.DOMUtil;
+import org.exist.fore.util.DOMUtil;
 import net.sf.saxon.dom.DOMNodeWrapper;
 import net.sf.saxon.expr.XPathContext;
 import net.sf.saxon.om.Item;

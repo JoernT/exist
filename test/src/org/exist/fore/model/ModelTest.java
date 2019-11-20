@@ -21,10 +21,8 @@
 package org.exist.fore.model;
 
 import junit.framework.TestCase;
-import org.exist.atom.util.DOM;
-import org.exist.fore.DOMComparator;
-import org.exist.fore.DOMUtil;
-import org.junit.After;
+import org.exist.fore.util.DOMComparator;
+import org.exist.fore.util.DOMUtil;
 import org.junit.Before;
 import org.junit.Test;
 import org.w3c.dom.Document;
@@ -33,8 +31,6 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.util.List;
-
-import static org.junit.Assert.*;
 
 public class ModelTest extends TestCase {
     private Document doc;
@@ -69,8 +65,8 @@ public class ModelTest extends TestCase {
         assertNotNull(instances);
         assertEquals(this.model.getInstances().size(),1);
         assertNotNull(this.model.getInstanceDocument("default"));
-
-
+        assertEquals(this.model.getModelBindings().size(),1);
+        assertEquals(this.model.getModelBindings().size(),1);
 
 
     }
@@ -88,6 +84,13 @@ public class ModelTest extends TestCase {
         assertNull(this.model.getInstance("foo"));
     }
 
+/*
+    public void testLookupBind() {
+        assertNotNull("b-greeting",this.model.binds);
+        String id = this.model.lookupBind("b-greeting").getId();
+        assertEquals("b-greeting",id);
+    }
+*/
 
     protected DOMComparator getComparator() {
         DOMComparator comparator = new DOMComparator();

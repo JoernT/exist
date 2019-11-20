@@ -7,8 +7,11 @@ package org.exist.fore.model;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.exist.fore.DOMUtil;
+import org.exist.fore.util.DOMUtil;
 import org.exist.fore.XFormsException;
+import org.exist.fore.model.constraints.ModelItem;
+import org.exist.fore.xpath.BetterFormXPathContext;
+import org.exist.fore.xpath.XPathUtil;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -16,6 +19,7 @@ import org.w3c.dom.Node;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import java.util.List;
 
 /**
  * Implementation of XForms instance Element.
@@ -39,6 +43,10 @@ public class Instance {
     public Instance(Element element, Model model) {
         this.element = element;
         this.model = model;
+    }
+
+    public static ModelItem createModelItem(Node node) {
+        return null;
     }
 
     // lifecycle methods
@@ -127,6 +135,19 @@ public class Instance {
 
     public String getId() {
         return this.element.getAttribute("id");
+    }
+
+    public ModelItem getModelItem(Node node) {
+        return null;
+    }
+
+    public BetterFormXPathContext getRootContext() {
+        return null;
+    }
+
+    public List getInstanceNodeset() {
+        String baseURI = model.getBaseURI();
+        return XPathUtil.getRootContext(this.instanceDocument,baseURI);
     }
 }
 

@@ -87,6 +87,10 @@ public class Bind extends XFormsElement {
      * @throws XFormsException if any error occurred during init.
      */
     public void init() throws XFormsException {
+        if(this.element.hasAttribute("id")){
+            this.id = this.element.getAttribute("id");
+        }
+        model.addBind(this);
         initializeModelItems();
 //        Initializer.initializeBindElements(getModel(), getElement(), this.referenceFinder);
     }
@@ -106,6 +110,7 @@ public class Bind extends XFormsElement {
         }
         // else - even if there's no binding expression at all the default instance is always the default ;)
         instance = getModel().getInstance(instanceId);
+
 
 
 /*

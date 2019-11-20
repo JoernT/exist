@@ -12,15 +12,16 @@ import org.apache.logging.log4j.Logger;
 import org.exist.fore.Initializer;
 import org.exist.fore.XFormsException;
 import org.exist.fore.model.bind.Bind;
-import org.w3c.dom.DOMException;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
+import org.exist.fore.model.constraints.MainDependencyGraph;
+import org.exist.fore.model.constraints.RefreshView;
+import org.exist.fore.xpath.BetterFormXPathContext;
+import org.exist.fore.xpath.XPathCache;
+import org.w3c.dom.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-
-import org.exist.fore.model.Instance;
+import java.util.Map;
 
 /**
  *
@@ -31,9 +32,20 @@ public class Model {
     private final Element element;
     private List instances;
     private List modelBindings;
+    private List refreshedItems;
+    private String baseURI;
+
+    public String getBaseURI() {
+        return baseURI;
+    }
+
+    public void setBaseURI(String baseURI) {
+        this.baseURI = baseURI;
+    }
+
+    public Map<String, Bind> binds;
     private final Configuration fConfiguration = new Configuration();
-
-
+    private MainDependencyGraph mainGraph;
 
 
     /**
@@ -106,7 +118,47 @@ public class Model {
 //        revalidate();
     }
 
+    public void rebuild(){
+        NodeList bindings = this.element.getElementsByTagName("xf-bind");
 
+
+        int len = bindings.getLength();
+
+
+        if (len != 0) {
+
+            Element bind = null;
+            for (int i = 0; i < len; i++) {
+                bind = (Element) bindings.item(i);
+
+                //evaluate binding expression to determine bound instance nodes
+                String bindingExpr;
+                if( bind.hasAttribute("ref")){
+                    String ref = bind.getAttribute("ref");
+
+                    try {
+                        Node n = XPathCache.getInstance().evaluateAsSingleNode((BetterFormXPathContext) getDefaultInstance().getInstanceDocument(),ref);
+
+                    } catch (XFormsException e) {
+                        e.printStackTrace();
+                    }
+
+                }else if (bind.hasAttribute("set")){
+
+                }else{
+
+                }
+
+
+            }
+
+        }
+
+
+
+
+
+    }
 
     /**
      * returns the default instance of this model. this is always the first in
@@ -186,6 +238,14 @@ public class Model {
         return this.element;
     }
 
+    public void addRefreshItem(RefreshView changed) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("add refreshView " + changed.toString());
+        }
+        this.refreshedItems.add(changed);
+    }
+
+
     /**
      * adds a Bind object to this Model
      *
@@ -197,6 +257,19 @@ public class Model {
         }
 
         this.modelBindings.add(bind);
+    }
+
+    public void addBind(Bind bind){
+        if(this.binds == null){
+            this.binds = new HashMap();
+        }
+        this.binds.put(bind.getId(),bind);
+    }
+
+
+
+    public Bind lookupBind(String id){
+        return this.binds.get(id);
     }
 
 

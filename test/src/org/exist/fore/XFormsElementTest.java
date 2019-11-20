@@ -18,50 +18,32 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-package org.exist.fore.model.bind;
+package org.exist.fore;
 
 import junit.framework.TestCase;
-import org.exist.fore.util.DOMUtil;
 import org.exist.fore.model.Model;
-import org.junit.After;
+import org.exist.fore.util.DOMUtil;
 import org.junit.Before;
 import org.junit.Test;
 import org.w3c.dom.Document;
 
-public class BindTest extends TestCase {
+public class XFormsElementTest extends TestCase {
     private Document doc;
     private Model model;
 
     @Before
     public void setUp() throws Exception {
-        String path = getClass().getResource("bind.html").getPath();
-        String fileURI = "file://" + path.substring(0, path.lastIndexOf("bind.html"));
+        String path = getClass().getResource("simple.html").getPath();
+        String fileURI = "file://" + path.substring(0, path.lastIndexOf("simple.html"));
 
         doc = DOMUtil.parseXmlFile(path,true,false);
 //        DOMUtil.prettyPrintDOM(doc);
 
         model = new Model(this.doc.getDocumentElement());
         model.init();
-
-    }
-
-    @After
-    public void tearDown() throws Exception {
     }
 
     @Test
-    public void testInit() {
-
-        assertEquals(4,this.model.getModelBindings().size());
-        assertEquals("item1",((Bind)this.model.getModelBindings().get(0)).getElement().getAttribute("id"));
-        assertEquals("item2",((Bind)this.model.getModelBindings().get(1)).getElement().getAttribute("id"));
-        assertEquals("item3",((Bind)this.model.getModelBindings().get(2)).getElement().getAttribute("id"));
-
-    }
-
-    public void testInitializeModelItems(){
-        assertEquals( ((Bind)this.model.getModelBindings().get(0)).getInstanceId(),"default");
-        assertEquals( ((Bind)this.model.getModelBindings().get(3)).getInstanceId(),"'other'");
-
+    public void init() {
     }
 }
