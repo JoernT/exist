@@ -30,18 +30,19 @@ import java.util.List;
 import java.util.Map;
 import org.exist.storage.DBBroker;
 import org.exist.storage.StartupTrigger;
+import org.exist.storage.txn.Txn;
 
 /**
  * Loads the RESTXQ Registry from disk during database startup
  * where the user account will be SYSTEM and has read access to
  * all queries
  *
- * @author Adam Retter <adam.retter@googlemail.com>
+ * @author <a href="mailto:adam.retter@googlemail.com">Adam Retter</a>
  */
 public class RestXqStartupTrigger implements StartupTrigger {
     
     @Override
-    public void execute(final DBBroker broker, final Map<String, List<?>> params) {
+    public void execute(final DBBroker broker, final Txn transaction, final Map<String, List<?>> params) {
         RestXqServiceRegistryManager.getRegistry(broker.getBrokerPool());
     }
 }

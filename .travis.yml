@@ -1,7 +1,64 @@
-sudo: false
 language: java
+
+dist: xenial
+
+services:
+  - docker
+
+env:
+  - BUILD_DOCKER=true
+
+matrix:
+  include:
+    - jdk: openjdk8
+    - jdk: openjdk9
+    - jdk: openjdk10
+    - jdk: openjdk11
+
+    - os: osx
+      osx_image: xcode9.3
+      env:
+         - JAVA_HOME=$(/usr/libexec/java_home)
+         - BUILD_DOCKER=false
+         - MAVEN_OPTS="-Ddependency-check.skip=true"
+
+deploy:
+  - provider: script
+    skip_cleanup: true
+    on:
+      jdk: openjdk8
+      branch: master
+      condition: $BUILD_DOCKER = true
+  #  before_script: echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  # see https://github.com/travis-ci/dpl/issues/673
+    script: >-
+      cd exist-docker &&
+      mvn -DskipTests -Ddocker.tag=release -Ddocker.username=$DOCKER_USERNAME -Ddocker.password=$DOCKER_PASSWORD docker:build docker:push &&
+      cd ..
+
+  - provider: script
+    skip_cleanup: true
+    on:
+      jdk: openjdk8
+      branch: develop
+      condition: $BUILD_DOCKER = true
+    script: >-
+      cd exist-docker &&
+      mvn -DskipTests -Ddocker.tag=latest -Ddocker.username=$DOCKER_USERNAME -Ddocker.password=$DOCKER_PASSWORD docker:build docker:push &&
+      cd ..
+
+
+cache:
+  directories:
+  - $HOME/.m2
+
+install: travis_wait mvn -T 2C -DskipTests=true -Dmaven.javadoc.skip=true -Ddocker=$BUILD_DOCKER install -B -V -q
+
+script: mvn -T 2C -Ddocker=$BUILD_DOCKER test -B
+
+after_failure:
+   - tar -cjf surefire-reports.tar.bz2 exist-core/target/surefire-reports exist-core/target/test-logs-*
+   - curl -v -u $CHUNK_USER:$CHUNK_PW -sT surefire-reports.tar.bz2 chunk.io
+
 notifications:
-  hipchat: ec8fcfa661addc56a361a8ef536320@integrations
-jdk:
- - oraclejdk8
-script: ./build.sh -Dexist.autodeploy=off -Dtest.haltonerror=true -Dtest.haltonfailure=true travis
+  slack: exist-db:IXzUdqA0n11cnxaDz43ZQgdX

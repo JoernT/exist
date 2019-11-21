@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TestSet>
+    <testName>fn regex related tests</testName>
+    <description>
+        <p>Test the regex related functions</p>
+        <author>James Fuller</author>
+    </description>
+    <setup>
+        <create-collection parent="/db" name="regex-test"/>
+        <store collection="/db/regex-test" name="test.xml"><![CDATA[
+            <test>
+                <para>a paragraph with text</para>
+            </test>
+        ]]></store>
+    </setup>
+    <tearDown>
+        <remove-collection collection="/db/regex-test"/>
+    </tearDown>
+    <test output="text">
+        <task>fn:matches1</task>
+        <code>fn:matches('exist', 'e')</code>
+        <expected>true</expected>
+    </test>
+    <test output="text">
+        <task>fn:matches2</task>
+        <code>fn:matches('exist', '[a-z]{5}')</code>
+        <expected>true</expected>
+    </test>
+    <test output="text">
+        <task>fn:matches-xflag-1</task>
+        <code>fn:matches('helloworld', 'hello world', 'x')</code>
+        <expected>true</expected>
+    </test>
+    <test output="text">
+        <task>fn:matches-xflag-2</task>
+        <code>fn:matches('helloworld', 'hello[ ]world', 'x')</code>
+        <expected>false</expected>
+    </test>
+    <test output="text">
+        <task>fn:matches-xflag-3</task>
+        <code>fn:matches('hello world', 'hello\ sworld', 'x')</code>
+        <expected>true</expected>
+    </test>
+    <test output="text">
+        <task>fn:matches-xflag-4</task>
+        <code>fn:matches('hello world', 'hello world', 'x')</code>
+        <expected>false</expected>
+    </test>
+    <test output="text">
+        <task>fn:matches-qflag-1</task>
+        <code>fn:matches("abcd", ".*", "q")</code>
+        <expected>false</expected>
+    </test>
+    <test output="text">
+        <task>fn:matches-iqflags-1</task>
+        <code>fn:matches("Mr. B. Obama", "B. OBAMA", "iq")</code>
+        <expected>true</expected>
+    </test>
+
+    <test output="text">
+        <task>fn:replace1</task>
+        <code>fn:replace('eximtdb', 'm', 's')</code>
+        <expected>existdb</expected>
+    </test>
+    <test output="text">
+        <task>fn:replace2</task>
+        <code>fn:replace('aaaah', 'a{2,3}?', 'X')</code>
+        <expected>XXh</expected>
+    </test>
+    <test output="text">
+        <task>fn:replace-qflag-1</task>
+        <code>fn:replace("a\b\c", "\", "\\", "q")</code>
+        <expected>a\\b\\c</expected>
+    </test>
+    <test output="text">
+        <task>fn:replace-qflag-2</task>
+        <code>fn:replace("a/b/c", "/", "$", "q")</code>
+        <expected>a$b$c</expected>
+    </test>
+    <test output="text">
+        <task>fn:replace-capturing-1</task>
+        <code>fn:replace("hello", "hel(lo)", "$1")</code>
+        <expected>lo</expected>
+    </test>
+    <test output="text">
+        <task>fn:replace-non-capturing-1</task>
+        <code>fn:replace("hello", "hel(?:lo)", "$1")</code>
+        <error>FORX0001</error>
+    </test>
+    <test output="text">
+        <task>fn:replace-non-capturing-2</task>
+        <code>fn:replace("hello", "h(?:el(lo))", "$1")</code>
+        <expected>lo</expected>
+    </test>
+
+    <test output="text">
+        <task>fn:tokenize-qflag-1</task>
+        <code>fn:tokenize("12.3.5.6", ".", "q")</code>
+        <expected>12 3 5 6</expected>
+    </test>
+
+</TestSet>

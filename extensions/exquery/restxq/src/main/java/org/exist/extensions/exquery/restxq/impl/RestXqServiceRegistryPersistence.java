@@ -45,6 +45,7 @@ import org.exist.storage.BrokerPool;
 import org.exist.storage.DBBroker;
 import org.exist.util.Configuration;
 import org.exist.util.FileUtils;
+import org.exist.util.io.TemporaryFileManager;
 import org.exist.xquery.CompiledXQuery;
 import org.exquery.ExQueryException;
 import org.exquery.restxq.RestXqService;
@@ -54,7 +55,7 @@ import org.exquery.xquery3.FunctionSignature;
 
 /**
  *
- * @author Adam Retter <adam.retter@googlemail.com>
+ * @author <a href="mailto:adam.retter@googlemail.com">Adam Retter</a>
  */
 public class RestXqServiceRegistryPersistence implements RestXqServiceRegistryListener {   
 
@@ -139,16 +140,16 @@ public class RestXqServiceRegistryPersistence implements RestXqServiceRegistryLi
         //we can ignore the change in service provided to this function as args, as we just write the details of all
         //services to disk, overwriting the old registry
         
-        final Optional<Path> optNewRegistry = getRegistryFile(true);
+        final Optional<Path> optTmpNewRegistry = getRegistryFile(true);
         
-        if(!optNewRegistry.isPresent()) {
+        if(!optTmpNewRegistry.isPresent()) {
             log.error("Could not save RESTXQ Registry to disk!");
         } else {
-            final Path newRegistry = optNewRegistry.get();
-            log.info("Preparing new RESTXQ registry on disk: " + newRegistry.toAbsolutePath().toString());
+            final Path tmpNewRegistry = optTmpNewRegistry.get();
+            log.info("Preparing new RESTXQ registry on disk: " + tmpNewRegistry.toAbsolutePath().toString());
 
             try {
-                try(final PrintWriter writer = new PrintWriter(Files.newBufferedWriter(newRegistry, StandardOpenOption.TRUNCATE_EXISTING))) {
+                try (final PrintWriter writer = new PrintWriter(Files.newBufferedWriter(tmpNewRegistry, StandardOpenOption.TRUNCATE_EXISTING))) {
 
                     writer.println(VERSION_LABEL + LABEL_SEP + REGISTRY_FILE_VERSION);
 
@@ -176,18 +177,21 @@ public class RestXqServiceRegistryPersistence implements RestXqServiceRegistryLi
                 }
 
                 final Optional<Path> optRegistry = getRegistryFile(false);
-                if(optRegistry.isPresent()) {
+                if (optRegistry.isPresent()) {
                     final Path registry = optRegistry.get();
 
                     //replace the original registry with the new registry
-                    Files.move(newRegistry, registry, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                    final Path localTmpNewRegistry = Files.copy(tmpNewRegistry, registry.getParent().resolve(tmpNewRegistry.getFileName()));
+                    Files.move(localTmpNewRegistry, registry, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 
-                    log.info("Replaced RESTXQ registry: " + FileUtils.fileName(newRegistry) + " -> " + FileUtils.fileName(registry));
+                    log.info("Replaced RESTXQ registry: " + FileUtils.fileName(tmpNewRegistry) + " -> " + FileUtils.fileName(registry));
                 } else {
                     throw new IOException("Unable to retrieve existing RESTXQ registry");
                 }
             } catch(final IOException ioe) {
                 log.error(ioe.getMessage(), ioe);
+            } finally {
+                TemporaryFileManager.getInstance().returnTemporaryFile(tmpNewRegistry);
             }
         }
     }
@@ -212,7 +216,8 @@ public class RestXqServiceRegistryPersistence implements RestXqServiceRegistryLi
 
             final Path registryFile;
             if(temp) {
-                registryFile = Files.createTempFile(dataDir, REGISTRY_FILENAME, ".tmp");
+                final TemporaryFileManager temporaryFileManager = TemporaryFileManager.getInstance();
+                registryFile = temporaryFileManager.getTemporaryFile();
             } else {
                 registryFile = dataDir.resolve(REGISTRY_FILENAME);
             }
