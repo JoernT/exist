@@ -5,7 +5,7 @@ package org.exist.fore;
  * @author Joern Turner
  */
 public class XFormsException extends Exception {
-
+    public static final String DEVIDER = " :: ";
     /**
      * The internal id of this exception, used for i18n.
      */

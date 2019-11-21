@@ -9,19 +9,27 @@ package org.exist.fore.model;
 import net.sf.saxon.Configuration;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.xerces.dom.DOMInputImpl;
+import org.apache.xerces.xs.*;
 import org.exist.fore.Initializer;
+import org.exist.fore.XFormsComputeException;
+import org.exist.fore.XFormsElement;
 import org.exist.fore.XFormsException;
 import org.exist.fore.model.bind.Bind;
 import org.exist.fore.model.constraints.MainDependencyGraph;
 import org.exist.fore.model.constraints.RefreshView;
-import org.exist.fore.xpath.BetterFormXPathContext;
-import org.exist.fore.xpath.XPathCache;
+import org.exist.fore.model.constraints.Validator;
+import org.exist.fore.xpath.*;
 import org.w3c.dom.*;
+import org.w3c.dom.bootstrap.DOMImplementationRegistry;
+import org.w3c.dom.ls.LSInput;
+import org.w3c.dom.ls.LSResourceResolver;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.InputStream;
+import java.io.Reader;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.*;
 
 /**
  *
@@ -34,6 +42,15 @@ public class Model {
     private List modelBindings;
     private List refreshedItems;
     private String baseURI;
+    private Validator validator;
+    private boolean ready = false;
+    public Map<String, Bind> binds;
+    private final Configuration fConfiguration = new Configuration();
+    private MainDependencyGraph mainGraph;
+    private static int modelItemCounter = 0;
+
+    private List schemas;
+    private static XSModel defaultSchema = null;
 
     public String getBaseURI() {
         return baseURI;
@@ -42,11 +59,6 @@ public class Model {
     public void setBaseURI(String baseURI) {
         this.baseURI = baseURI;
     }
-
-    public Map<String, Bind> binds;
-    private final Configuration fConfiguration = new Configuration();
-    private MainDependencyGraph mainGraph;
-
 
     /**
      * Creates a new Model object.
@@ -81,16 +93,14 @@ public class Model {
     private void modelConstruct() throws XFormsException {
         // load schemas
 //        this.schemas = new ArrayList();
-//        loadDefaultSchema(this.schemas);
+        loadDefaultSchema(this.schemas);
 
         // The default schema is shared between all models of all forms, and isn't thread safe, so we need synchronization here.
         // We cache the default model bcz. it takes quite some time to construct it.
-/*
         synchronized (Model.class) {
             // set datatypes for validation
             getValidator().setDatatypes(getNamedDatatypes(this.schemas));
         }
-*/
 
 
         // build instances
@@ -109,16 +119,58 @@ public class Model {
 
         // todo: initialize p3p ?
         // initialize binds and submissions (actions should be initialized already)
-        Initializer.initializeBindElements(this, this.element);
+
+        Initializer.initializeBindElements(this, this.element, new BindFunctionReferenceFinderImpl());
 //        Initializer.initializeActionElements(this, this.element);
 //        Initializer.initializeSubmissionElements(this, this.element);
 
 //        rebuild();
 //        recalculate();
 //        revalidate();
+
+        this.ready=true;
     }
 
-    public void rebuild(){
+    /**
+     * Generates a model item id.
+     *
+     * @return a model item id.
+     */
+    public static String generateModelItemId() {
+        // todo: build external id service
+        return String.valueOf(++modelItemCounter);
+    }
+
+    public boolean isReady(){
+        return this.ready;
+    }
+
+    public void rebuild() throws XFormsComputeException {
+
+        if (this.modelBindings != null && this.modelBindings.size() > 0) {
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug(this + " rebuild: creating main dependency graph for " +
+                        this.modelBindings.size() + " bind(s)");
+            }
+
+            this.mainGraph = new MainDependencyGraph();
+
+            for (int index = 0; index < this.modelBindings.size(); index++) {
+                Bind bind = (Bind) this.modelBindings.get(index);
+                try {
+                    bind.updateXPathContext();
+                } catch (XFormsException e) {
+                    throw new XFormsComputeException(e.getMessage(), bind.getElement(), bind);
+
+                }
+//                this.mainGraph.buildBindGraph(bind, this);
+            }
+
+//            this.changed = (Vector) this.mainGraph.getVertices().clone();
+        }
+
+
+        /*
         NodeList bindings = this.element.getElementsByTagName("xf-bind");
 
 
@@ -153,6 +205,7 @@ public class Model {
             }
 
         }
+*/
 
 
 
@@ -309,6 +362,226 @@ public class Model {
     public List getModelBindings() {
         return modelBindings;
     }
+
+    /**
+     * Returns the validator.
+     *
+     * @return the validator.
+     */
+    public Validator getValidator() {
+        if (this.validator == null) {
+            this.validator = new Validator();
+            this.validator.setModel(this);
+        }
+
+        return this.validator;
+    }
+
+    private void loadDefaultSchema(List list) throws XFormsException {
+        try {
+            synchronized (Model.class) {
+                if (this.defaultSchema == null) {
+                    // todo: still a hack
+                    InputStream stream = Model.class.getResourceAsStream("XFormsDatatypes11.xsd");
+                    this.defaultSchema = loadSchema(stream);
+                }
+
+                if (this.defaultSchema == null) {
+                    throw new NullPointerException("resource not found");
+                }
+                list.add(this.defaultSchema);
+            }
+        }
+        catch (Exception e) {
+            throw new XFormsException("LINK-EXCEPTION: could not load default schema");
+        }
+    }
+
+    private XSModel loadSchema(InputStream stream) throws IllegalAccessException, ClassNotFoundException, InstantiationException {
+        LSInput input = new DOMInputImpl();
+        input.setByteStream(stream);
+
+        return getSchemaLoader().load(input);
+    }
+
+    private XSLoader getSchemaLoader() throws IllegalAccessException,
+            InstantiationException, ClassNotFoundException {
+        // System.setProperty(DOMImplementationRegistry.PROPERTY,
+        // "org.apache.xerces.dom.DOMXSImplementationSourceImpl");
+        DOMImplementationRegistry registry = DOMImplementationRegistry.newInstance();
+        XSImplementation implementation = (XSImplementation) registry.getDOMImplementation("XS-Loader");
+        XSLoader loader = implementation.createXSLoader(null);
+
+        DOMConfiguration cfg = loader.getConfig();
+
+        cfg.setParameter("resource-resolver", new LSResourceResolver() {
+            public LSInput resolveResource(String type,
+                                           String namespaceURI,
+                                           String publicId,
+                                           String systemId,
+                                           String baseURI) {
+                LSInput input = new LSInput() {
+                    String systemId;
+
+                    public void setSystemId(String systemId) {
+                        this.systemId = systemId;
+                    }
+
+                    public void setStringData(String s) {
+                    }
+
+                    String publicId;
+
+                    public void setPublicId(String publicId) {
+                        this.publicId = publicId;
+                    }
+
+                    public void setEncoding(String s) {
+                    }
+
+                    public void setCharacterStream(Reader reader) {
+                    }
+
+                    public void setCertifiedText(boolean flag) {
+                    }
+
+                    public void setByteStream(InputStream inputstream) {
+                    }
+
+                    String baseURI;
+
+                    public void setBaseURI(String baseURI) {
+                        if(baseURI == null || "".equals(baseURI)){
+                            baseURI = getBaseURI();
+                        }
+                        this.baseURI = baseURI;
+                    }
+
+                    public String getSystemId() {
+                        return this.systemId;
+                    }
+
+                    public String getStringData() {
+                        return null;
+                    }
+
+                    public String getPublicId() {
+                        return this.publicId;
+                    }
+
+                    public String getEncoding() {
+                        return null;
+                    }
+
+                    public Reader getCharacterStream() {
+                        return null;
+                    }
+
+                    public boolean getCertifiedText() {
+                        return false;
+                    }
+
+                    public InputStream getByteStream() {
+                        if(LOGGER.isTraceEnabled()){
+                            LOGGER.trace("Schema resource\n\t\t publicId '" + publicId + "'\n\t\t systemId '" + systemId + "' requested");
+                        }
+                        String pathToSchema = null;
+                        if ("http://www.w3.org/MarkUp/SCHEMA/xml-events-attribs-1.xsd".equals(systemId)){
+                            pathToSchema = "schema/xml-events-attribs-1.xsd";
+                        } else if("http://www.w3.org/2001/XMLSchema.xsd".equals(systemId)) {
+                            pathToSchema = "schema/XMLSchema.xsd";
+                        } else if("-//W3C//DTD XMLSCHEMA 200102//EN".equals(publicId)){
+                            pathToSchema = "schema/XMLSchema.dtd";
+                        } else if("datatypes".equals(publicId)){
+                            pathToSchema = "schema/datatypes.dtd";
+                        } else if("http://www.w3.org/2001/xml.xsd".equals(systemId)){
+                            pathToSchema = "schema/xml.xsd";
+                        }
+
+
+                        // LOAD WELL KNOWN SCHEMA
+                        if(pathToSchema != null) {
+                            if (LOGGER.isTraceEnabled()) {
+                                LOGGER.trace("loading Schema '" +  pathToSchema + "'\n\n");
+                            }
+                            return Thread.currentThread().getContextClassLoader().getResourceAsStream(pathToSchema);
+                        }
+                        // LOAD SCHEMA THAT IS NOT(!) YET KNWON TO THE XFORMS PROCESSOR
+/*
+                        else if (systemId != null && !"".equals(systemId)) {
+                            URI schemaURI = new URI(baseURI);
+                            schemaURI = schemaURI.resolve(systemId);
+
+                            // ConnectorFactory.getFactory()
+                            if (LOGGER.isDebugEnabled()) {
+                                LOGGER.debug("loading schema resource '" + schemaURI.toString() + "'\n\n");
+                            }
+                            return ConnectorFactory.getFactory().getHTTPResourceAsStream(schemaURI);
+
+                        }
+*/
+                        else {
+                            LOGGER.error("resource not known '" + systemId + "'\n\n");
+                            return null;
+                        }
+
+                    }
+
+                    public String getBaseURI() {
+                        return this.baseURI;
+                    }
+                };
+                input.setSystemId(systemId);
+                input.setBaseURI(baseURI);
+                input.setPublicId(publicId);
+                return input;
+            }
+        });
+        // END: Patch
+        return loader;
+    }
+
+    public Map getNamedDatatypes(List schemas) {
+        Map datatypes = new HashMap();
+
+        // iterate schemas
+        Iterator schemaIterator = schemas.iterator();
+        while (schemaIterator.hasNext()) {
+            XSModel schema = (XSModel) schemaIterator.next();
+            XSNamedMap definitions = schema.getComponents(XSConstants.TYPE_DEFINITION);
+
+            for (int index = 0; index < definitions.getLength(); index++) {
+                XSTypeDefinition type = (XSTypeDefinition) definitions.item(index);
+
+                // process named simple types being supported by XForms
+                if (type.getTypeCategory() == XSTypeDefinition.SIMPLE_TYPE &&
+                        !type.getAnonymous() &&
+                        getValidator().isSupported(type.getName())) {
+                    String name = type.getName();
+
+                    // extract local name
+                    int separator = name.indexOf(':');
+                    String localName = separator > -1 ? name.substring(separator + 1) : name;
+
+                    // build expanded name
+                    String namespaceURI = type.getNamespace();
+                    String expandedName = NamespaceResolver.expand(namespaceURI, localName);
+
+                    if (NamespaceConstants.XFORMS_NS.equals(namespaceURI) ||
+                            NamespaceConstants.XMLSCHEMA_NS.equals(namespaceURI)) {
+                        // register default xforms and schema datatypes without namespace for convenience
+                        datatypes.put(localName, type);
+                    }
+
+                    // register uniquely named type
+                    datatypes.put(expandedName, type);
+                }
+            }
+        }
+
+        return datatypes;
+    }
+
 }
 
 // end of class

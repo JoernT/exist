@@ -18,15 +18,16 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-package org.exist.fore.model;
+package org.exist.fore.model.bind;
 
+import org.exist.fore.model.Model;
 import org.exist.fore.xpath.XPathParseUtil;
 import org.w3c.dom.Element;
 
 import java.util.Collections;
 import java.util.List;
 
-public class Bind {
+public class BindUtil {
 
     /**
      * evaluates the 'in scope evaluation context' and returns a List of NodeInfo objects representing the
@@ -38,12 +39,13 @@ public class Bind {
      */
     public static List evalInScopeContext(Model model, Element bind) {
         final List resultNodeset;
-
-        Element parentBind = (Element) bind.getParentNode();
+        //todo: error here - parentBind is no bind element
+//        Element parentBind = (Element) bind.getParentNode();
+        Element parentBind = getParentBind(bind);
         if(parentBind != null){
             resultNodeset = (List) parentBind.getUserData("boundNodes");
-        }else if( Bind.hasAbsoluteBinding(bind)){
-            String instanceId = XPathParseUtil.getInstanceParameter(Bind.getBindExpr(bind));
+        }else if( BindUtil.hasAbsoluteBinding(bind)){
+            String instanceId = XPathParseUtil.getInstanceParameter(BindUtil.getBindExpr(bind));
             resultNodeset = model.getInstance(instanceId).getInstanceNodeset();
         }else if(model.getDefaultInstance() != null){
             resultNodeset = model.getDefaultInstance().getInstanceNodeset();
@@ -54,7 +56,14 @@ public class Bind {
         return resultNodeset;
     }
 
+    private static Element getParentBind(Element element){
+        Element parent = (Element) element.getParentNode();
 
+        if(parent != null && parent.getNodeName().equalsIgnoreCase("xf-bind")){
+            return parent;
+        }
+        return null;
+    }
 
     public static boolean hasAbsoluteBinding(Element bind){
         String binding = getBindExpr(bind);

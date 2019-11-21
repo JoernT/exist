@@ -5,21 +5,21 @@
 
 package org.exist.fore.model;
 
+import net.sf.saxon.trans.XPathException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.exist.fore.util.DOMUtil;
 import org.exist.fore.XFormsException;
 import org.exist.fore.model.constraints.ModelItem;
 import org.exist.fore.xpath.BetterFormXPathContext;
+import org.exist.fore.xpath.XPathCache;
+import org.exist.fore.xpath.XPathFunctionContext;
 import org.exist.fore.xpath.XPathUtil;
-import org.w3c.dom.DOMException;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
+import org.w3c.dom.*;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import java.util.List;
+import java.util.*;
 
 /**
  * Implementation of XForms instance Element.
@@ -46,7 +46,34 @@ public class Instance {
     }
 
     public static ModelItem createModelItem(Node node) {
-        return null;
+        String id = Model.generateModelItemId();
+        ModelItem modelItem;
+        if (node.getNodeType() == Node.ELEMENT_NODE) {
+            modelItem = new XercesElementImpl(id);
+        }
+        else {
+            modelItem = new XercesNodeImpl(id);
+        }
+        modelItem.setNode(node);
+
+        Node parentNode;
+        if (node.getNodeType() == Node.ATTRIBUTE_NODE) {
+            parentNode = ((Attr) node).getOwnerElement();
+        }
+        else {
+            parentNode = node.getParentNode();
+        }
+        if (parentNode != null) {
+            ModelItem parentItem = (ModelItem) parentNode.getUserData("");
+            if (parentItem == null) {
+                parentItem = createModelItem(parentNode);
+            }
+
+            modelItem.setParent(parentItem);
+        }
+
+        node.setUserData("", modelItem,null);
+        return modelItem;
     }
 
     // lifecycle methods
@@ -138,7 +165,35 @@ public class Instance {
     }
 
     public ModelItem getModelItem(Node node) {
-        return null;
+        String id = Model.generateModelItemId();
+        ModelItem modelItem;
+        if (node.getNodeType() == Node.ELEMENT_NODE) {
+            modelItem = new XercesElementImpl(id);
+        }
+        else {
+            modelItem = new XercesNodeImpl(id);
+        }
+        modelItem.setNode(node);
+
+        Node parentNode;
+        if (node.getNodeType() == Node.ATTRIBUTE_NODE) {
+            parentNode = ((Attr) node).getOwnerElement();
+        }
+        else {
+            parentNode = node.getParentNode();
+        }
+        if (parentNode != null) {
+            ModelItem parentItem = (ModelItem) parentNode.getUserData("");
+            if (parentItem == null) {
+                parentItem = createModelItem(parentNode);
+            }
+
+            modelItem.setParent(parentItem);
+        }
+
+        node.setUserData("", modelItem,null);
+        return modelItem;
+
     }
 
     public BetterFormXPathContext getRootContext() {
@@ -149,6 +204,75 @@ public class Instance {
         String baseURI = model.getBaseURI();
         return XPathUtil.getRootContext(this.instanceDocument,baseURI);
     }
+
+    /**
+     * Returns an iterator over all existing model items.
+     *
+     * @return an iterator over all existing model items.
+     * @throws XFormsException
+     */
+    public Iterator iterateModelItems() throws XFormsException {
+        return iterateModelItems(getInstanceNodeset(), 1, "/", Collections.EMPTY_MAP, null, true);
+    }
+
+    /**
+     * Returns an iterator over the specified model items.
+     *
+     * @param path the path selecting a set of model items.
+     * @param deep include attributes and children or not.
+     * @return an iterator over the specified model items.
+     * @throws XPathException
+     */
+    public Iterator iterateModelItems(List nodeset, int position, String path, Map prefixMapping, XPathFunctionContext functionContext, boolean deep) throws XFormsException {
+        final List xpathResult = XPathCache.getInstance().evaluate(nodeset, position, path, prefixMapping, functionContext);
+
+        return iterateModelItems(xpathResult, deep);
+    }
+
+    /**
+     * Returns an iterator over the specified model items.
+     *
+     * @param nodeset from which the model items should be retrieved
+     */
+    public Iterator iterateModelItems(List nodeset, boolean deep) {
+        // create list, fill and iterate it
+        // todo: optimize with live iterator
+
+        final List list = new ArrayList();
+
+        for (int i = 0; i < nodeset.size(); ++i) {
+            Node node =  XPathUtil.getAsNode(nodeset, i + 1);
+            listModelItems(list, node, deep);
+        }
+
+        return list.iterator();
+    }
+
+    private void listModelItems(List list, Node node, boolean deep) {
+        ModelItem modelItem = (ModelItem) node.getUserData("");
+        if (modelItem == null) {
+            modelItem = createModelItem(node);
+        }
+        list.add(modelItem);
+
+        if (deep) {
+            NamedNodeMap attributes = node.getAttributes();
+            for (int index = 0; attributes != null && index < attributes.getLength(); index++) {
+                listModelItems(list, attributes.item(index), deep);
+            }
+            if(node.getNodeType() !=  Node.ATTRIBUTE_NODE){
+                NodeList children = node.getChildNodes();
+                for (int index = 0; index < children.getLength(); index++) {
+                    listModelItems(list, children.item(index), deep);
+                }
+            }
+        }
+    }
+
+    public Model getModel(){
+        return this.model;
+    }
+
 }
 
 // end of class

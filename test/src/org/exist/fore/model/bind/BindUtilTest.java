@@ -28,7 +28,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.w3c.dom.Document;
 
-public class BindTest extends TestCase {
+import java.util.List;
+
+public class BindUtilTest extends TestCase {
     private Document doc;
     private Model model;
 
@@ -56,6 +58,10 @@ public class BindTest extends TestCase {
         assertEquals("item1",((Bind)this.model.getModelBindings().get(0)).getElement().getAttribute("id"));
         assertEquals("item2",((Bind)this.model.getModelBindings().get(1)).getElement().getAttribute("id"));
         assertEquals("item3",((Bind)this.model.getModelBindings().get(2)).getElement().getAttribute("id"));
+
+        List nl = ((Bind)this.model.getModelBindings().get(0)).nodeset;
+
+        assertEquals("item1",nl);
 
     }
 

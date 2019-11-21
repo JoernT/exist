@@ -8,6 +8,7 @@ package org.exist.fore;
 
 import org.exist.fore.model.Model;
 import org.exist.fore.model.bind.Bind;
+import org.exist.fore.xpath.BindFunctionReferenceFinderImpl;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -35,9 +36,10 @@ public class Initializer {
      *
      * @param model   the current context model.
      * @param element the element to start with.
+     * @param bindFunctionReferenceFinder
      * @throws XFormsException if any error occurred during init.
      */
-    public static void initializeBindElements(Model model, Element element) throws XFormsException {
+    public static void initializeBindElements(Model model, Element element, BindFunctionReferenceFinderImpl bindFunctionReferenceFinder) throws XFormsException {
         NodeList childNodes = element.getChildNodes();
 
         for (int index = 0; index < childNodes.getLength(); index++) {
@@ -48,6 +50,7 @@ public class Initializer {
 
                 if (elementImpl.getLocalName().equals("xf-bind")) {
                     Bind bindElement = new Bind(elementImpl, model);
+                    bindElement.setReferenceFinder(bindFunctionReferenceFinder);
                     bindElement.init();
                 }
             }

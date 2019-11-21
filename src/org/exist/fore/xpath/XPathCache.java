@@ -134,7 +134,7 @@ public class XPathCache {
 
 
         try {
-            final XPathExpression exp = getXPathExpression(xpathString, prefixMapping, functionContext != null ? functionContext.getXFormsElement().getContainerObject().getConfiguration() : XPathCache.kCONFIG);
+            final XPathExpression exp = getXPathExpression(xpathString, prefixMapping, XPathCache.kCONFIG);
             final XPathDynamicContext context = exp.createDynamicContext((Item) nodeset.get(position - 1));
             FocusTrackingIterator nodesetIt = new FocusTrackingIterator(new ListSequenceIterator(nodeset, position));
             nodesetIt.next();
@@ -186,10 +186,11 @@ public class XPathCache {
         independentContext.setBackwardsCompatibilityMode(true);
 
         // XXX set base URI
-
-        for (Iterator it = prefixMapping.entrySet().iterator(); it.hasNext();) {
-            Map.Entry entry = (Map.Entry) it.next();
-            independentContext.declareNamespace((String) entry.getKey(), (String) entry.getValue());
+        if(prefixMapping != null) {
+            for (Iterator it = prefixMapping.entrySet().iterator(); it.hasNext(); ) {
+                Map.Entry entry = (Map.Entry) it.next();
+                independentContext.declareNamespace((String) entry.getKey(), (String) entry.getValue());
+            }
         }
         //independentContext.declareNamespace("bffn","java:de.betterform.xml.xforms.xpath.BetterFormXPathFunctions");
         // XXX declare variable
