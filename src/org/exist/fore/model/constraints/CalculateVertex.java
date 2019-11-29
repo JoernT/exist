@@ -54,9 +54,12 @@ public class CalculateVertex extends Vertex {
     public void compute() throws XFormsException {
 
             if (this.xpathExpression != null) {
-                    ModelItem modelItem = (ModelItem) this.instanceNode.getUserData("");
+                    ModelItem modelItem = (ModelItem) this.instanceNode.getUserData("modelItem");
                 try {
                     String result = XPathCache.getInstance().evaluateAsString(relativeContext, "string(" + this.xpathExpression + ")");
+                    if(result != modelItem.getValue()){
+                        modelItem.getRefreshView().setValueChangedMarker();
+                    }
                     modelItem.setValue(result);
 
                     if (LOGGER.isDebugEnabled()) {

@@ -152,5 +152,6 @@
     <orderEntry type="library" name="exquery-restxq" level="project" />
     <orderEntry type="library" name="exquery-core" level="project" />
     <orderEntry type="library" name="expath" level="project" />
+    <orderEntry type="library" name="javax.json-1.1.4" level="project" />
   </component>
 </module>

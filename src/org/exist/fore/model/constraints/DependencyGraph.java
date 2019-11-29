@@ -77,6 +77,8 @@ public class DependencyGraph {
      * @return a list with nodes referenced in given xpath
      */
     public Vector getXPathRefNodes(BetterFormXPathContext relativeContext, String xpath, Set references) throws XFormsException {
+        if(references == null) return null;
+
         Vector refNodes = new Vector();
         Iterator pathes = references.iterator();
 

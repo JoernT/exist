@@ -122,7 +122,7 @@ public class XPathParseUtil {
     public static String getInstanceParameter(String path) {
         if (XPathParseUtil.hasInstanceFunction(path)) {
             String instance = XPathParseUtil.splitPathExpr(path, 1)[0];
-            return instance.substring(INSTANCE_FUNCTION.length(), instance.lastIndexOf(')'));
+            return instance.substring(INSTANCE_FUNCTION.length()+1, instance.lastIndexOf(')') -1);
         }
 
         return null;

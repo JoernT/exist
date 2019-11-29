@@ -5,15 +5,15 @@
 
 package org.exist.fore.model.bind;
 
+import net.sf.saxon.dom.DOMNodeWrapper;
 import org.apache.commons.lang3.text.WordUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.exist.fore.XFormsComputeException;
-import org.exist.fore.XFormsConstants;
-import org.exist.fore.XFormsElement;
-import org.exist.fore.XFormsException;
+import org.exist.fore.*;
 import org.exist.fore.model.Instance;
 import org.exist.fore.model.Model;
+import org.exist.fore.model.constraints.ElementItem;
+import org.exist.fore.model.constraints.NodeItem;
 import org.exist.fore.model.constraints.ConstraintAttribute;
 import org.exist.fore.model.constraints.ConstraintElement;
 import org.exist.fore.model.constraints.DeclarationView;
@@ -81,6 +81,8 @@ public class Bind extends XFormsElement {
     protected final Map prefixMapping;
     private BindFunctionReferenceFinderImpl referenceFinder;
 
+    private List modelItems;
+
     /**
      * Creates a new Bind object.
      *
@@ -92,7 +94,7 @@ public class Bind extends XFormsElement {
         this.constraints = new ArrayList();
         // register with model
         getModel().addBindElement(this);
-
+        this.modelItems = new ArrayList();
         this.prefixMapping = NamespaceResolver.getAllNamespaces(this.element);
 
     }
@@ -106,197 +108,27 @@ public class Bind extends XFormsElement {
         if (this.element.hasAttribute("id")) {
             this.id = this.element.getAttribute("id");
         }
+        //todo: see constructor
         model.addBind(this);
 
-        initializeBindingContext();
-        initializeModelItems();
-//        Initializer.initializeBindElements(getModel(), getElement(), this.referenceFinder);
-    }
+        this.updateXPathContext(); //init this.nodeset
 
-    /**
-     * Updates the childEvaluationContext
-     *
-     * @throws XFormsException in case an XPathException happens during evaluation
-     */
-    public void updateXPathContext() throws XFormsException {
-
-        List inscopeContext = BindUtil.evalInScopeContext(this.model, this.getElement());
-
-        // if(LOGGER.isDebugEnabled()){
-        // NodeWrapper info = (NodeWrapper) parentNodeset.get(0);
-        // LOGGER.debug(this + " bound to Node:" + info.getUnderlyingNode());
-        // LOGGER.debug("in scope xpath context for " + this + " = " +
-        // BindingResolver.getExpressionPath(this,repeatItemId));
-        // }
-
-        final String relativeExpr = getBindingExpression();
-        if (relativeExpr != null) {
-            if (this.nodeset == null) {
-                this.nodeset = new ArrayList();
-            } else {
-                // When rebuild is called we should clear the list before adding all the nodes again.
-                this.nodeset.clear();
-            }
-            for (int i = 0; i < inscopeContext.size(); ++i) {
-                this.nodeset.addAll(XPathCache.getInstance().evaluate(inscopeContext, i + 1, relativeExpr, this.prefixMapping, xpathFunctionContext));
-            }
-        } else {
-            this.nodeset = inscopeContext;
-        }
-    }
-
-
-    /**
-     * Initializes all bound model items.
-     *
-     * @throws XFormsException if any error occured during model item init.
-     */
-    protected void initializeModelItems() throws XFormsException {
+        // determine instance id this bind is belonging to
         String bindingExpression = getBindingExpression();
-        Instance instance;
-
         // bindingExpression starts with 'instance' function
         if (bindingExpression != null && bindingExpression.startsWith("instance(")) {
             this.instanceId = XPathParseUtil.getInstanceParameter(bindingExpression);
         }
-        // else - even if there's no binding expression at all the default instance is always the default ;)
-        instance = getModel().getInstance(instanceId);
 
 
-        List nodeset = this.nodeset;
-        if (nodeset != null && nodeset.size() > 0) {
-            Iterator iterator = instance.iterateModelItems(nodeset, false);
-            if (iterator != null) {
-                ModelItem modelItem;
-                while (iterator.hasNext()) {
-                    modelItem = (ModelItem) iterator.next();
-                    if (LOGGER.isDebugEnabled()) {
-                        LOGGER.debug(this + " init: model item for " + DOMUtil.getCanonicalPath((Node) modelItem.getNode()));
-                    }
+        initializeBinding();
 
-                    // 4.2.1 - 4.b applying model item properties to each node
-                    initializeModelItemProperties(modelItem);
+        this.createModelItems();
 
 
-                }
-            }
-        }
-    }
 
-    /**
-     * Initializes the model item properties of the specified model item.
-     *
-     * @param item the model item.
-     * @throws XFormsException if any error occured during model item properties init.
-     */
-    protected void initializeModelItemProperties(ModelItem item) throws XFormsException {
-        DeclarationView declaration = item.getDeclarationView();
-
-        if (this.type != null) {
-            if (declaration.getDatatype() != null) {
-                throw new XFormsException("BINDING-EXCEPTION: property 'type' already present at model item", null, this.id);
-            }
-
-            if (!this.model.getValidator().isSupported(this.type)) {
-                throw new XFormsException("BINDING-EXCEPTION: datatype '" + this.type + "' is not supported", null, this.id);
-            }
-            if (!this.model.getValidator().isKnown(this.type)) {
-                throw new XFormsException("BINDING-EXCEPTION: datatype '" + this.type + "' is unknown", null, this.id);
-            }
-
-            declaration.setDatatype(this.type);
-        }
-
-        if (this.readonly != null) {
-            if (declaration.getReadonly() != null) {
-                this.readonly = declaration.getReadonly() + " " + COMBINE_ONE + " " + this.readonly;
-//                throw new XFormsBindingException("property 'readonly' already present at model item", this.target, this.id);
-            }
-            this.readonlyReferences = this.referenceFinder.getReferences(this.readonly, this.prefixMapping, this.model);
-            declaration.setReadonly(this.readonly);
-        }
-
-        if (this.required != null) {
-            if (declaration.getRequired() != null) {
-                this.required = declaration.getRequired() + " " + COMBINE_ONE + " " + this.required;
-//                throw new XFormsBindingException("property 'required' already present at model item", this.target, this.id);
-            }
-            this.requiredReferences = this.referenceFinder.getReferences(this.required, this.prefixMapping, this.model);
-            declaration.setRequired(this.required);
-        }
-
-        if (this.relevant != null) {
-            if (declaration.getRelevant() != null) {
-                this.relevant = declaration.getRelevant() + " " + COMBINE_ONE + " " + this.relevant;
-//                throw new XFormsBindingException("property 'relevant' already present at model item", this.target, this.id);
-            }
-            this.relevantReferences = this.referenceFinder.getReferences(this.relevant, this.prefixMapping, this.model);
-            declaration.setRelevant(this.relevant);
-        }
-
-        if (this.calculate != null) {
-            if (declaration.getCalculate() != null) {
-                throw new XFormsException("BINDING-EXCEPTION: property 'calculate' already present at model item", null, this.id);
-            }
-
-            declaration.setCalculate(this.calculate);
-        }
-
-        //should be: declaration.addConstraint(this.
-//        if(this.constraints.size() != 0){
-//
-//        }
-        if (this.constraint != null) {
-            if (declaration.getConstraint() != null) {
-                /* TODO ADAPT ME TO LIST ME*/
-                this.constraint = declaration.getConstraint() + " " + COMBINE_ALL + " " + this.constraint;
-            }
-
-            /* TODO REMOVE ME*/
-            declaration.setConstraint(this.constraint);
-            declaration.setConstraints(this.constraints);
-        }
-
-        if (this.p3ptype != null) {
-            if (declaration.getP3PType() != null) {
-                throw new XFormsException("BINDING-EXCEPTION: property 'p3ptype' already present at model item", null, this.id);
-            }
-
-            declaration.setP3PType(this.p3ptype);
-        }
-        updateXPathContext();
-
-    }
-
-
-    /**
-     * Returns the binding expression.
-     *
-     * @return the binding expression.
-     */
-    public String getBindingExpression() {
-        if (this.element.hasAttribute("ref")) {
-            return this.element.getAttribute("ref");
-        }
-        return this.element.getAttribute("set");
-    }
-
-    public String getInstanceId() {
-        return instanceId;
-    }
-
-    @Override
-    public void dispose() throws XFormsException {
-    }
-
-    @Override
-    protected Log getLogger() {
-        return LOGGER;
-    }
-
-
-    public void setReferenceFinder(BindFunctionReferenceFinderImpl bindFunctionReferenceFinder) {
-        this.referenceFinder = bindFunctionReferenceFinder;
+//        initializeModelItems();
+        Initializer.initializeBindElements(getModel(), getElement(), this.referenceFinder);
     }
 
     /**
@@ -304,7 +136,7 @@ public class Bind extends XFormsElement {
      *
      * @throws XFormsException if any error occured during binding context init.
      */
-    protected void initializeBindingContext() throws XFormsException {
+    protected void initializeBinding() throws XFormsException {
         // resolve location path and instance id
 /*
         this.locationPath = this.container.getBindingResolver().resolve(this);
@@ -315,11 +147,9 @@ public class Bind extends XFormsElement {
 
         // get type attributes
         //todo:support combination
-        this.p3ptype = getXFormsAttribute(P3PTYPE_ATTRIBUTE);
 */
 
         try {
-//            this.type = getXFormsAttribute(TYPE_ATTRIBUTE);
             this.type = getMIP(TYPE);
 
 
@@ -364,12 +194,394 @@ public class Bind extends XFormsElement {
             }
 */
 
-            this.updateXPathContext();
+//            this.updateXPathContext();
         }
         catch(XFormsComputeException e) {
             throw e;
         }
     }
+
+    private void createModelItems() throws XFormsException {
+        for (int i = 0; i < this.nodeset.size(); i++) {
+            Node node = (Node) ((DOMNodeWrapper)this.nodeset.get(i)).getUnderlyingNode();
+            System.out.println("node " + node.toString());
+
+            ModelItem item = this.createModelItem(node);
+            this.modelItems.add(item);
+            node.setUserData("modelItem",item,null);
+            this.initializeModelItemProperties(item);
+
+        }
+        System.out.println("end");
+    }
+
+    public static ModelItem createModelItem(Node node){
+        String id = Model.generateModelItemId();
+        ModelItem modelItem;
+        if (node.getNodeType() == Node.ELEMENT_NODE) {
+            modelItem = new ElementItem(id);
+        }
+        else {
+            modelItem = new NodeItem(id);
+        }
+        modelItem.setNode(node);
+        return modelItem;
+    }
+
+    /**
+     *
+     * @return the nodeset the Bind is referring to via its binding attribute
+     */
+    public List getNodeset() {
+        return this.nodeset;
+    }
+
+
+    /**
+     * Returns the <code>type</code> attribute.
+     *
+     * @return the <code>type</code> attribute.
+     */
+    public String getDatatype() {
+        return this.type;
+    }
+
+    /**
+     * Returns the <code>readonly</code> attribute.
+     *
+     * @return the <code>readonly</code> attribute.
+     */
+    public String getReadonly() {
+        return this.readonly;
+    }
+
+    /**
+     * Returns the <code>required</code> attribute.
+     *
+     * @return the <code>required</code> attribute.
+     */
+    public String getRequired() {
+        return this.required;
+    }
+
+    /**
+     * Returns the <code>relevant</code> attribute.
+     *
+     * @return the <code>relevant</code> attribute.
+     */
+    public String getRelevant() {
+        return this.relevant;
+    }
+
+    /**
+     * Returns the <code>calculate</code> attribute.
+     *
+     * @return the <code>calculate</code> attribute.
+     */
+    public String getCalculate() {
+        return this.calculate;
+    }
+
+    /**
+     * Returns the <code>constraint</code> attribute.
+     *
+     * @return the <code>constraint</code> attribute.
+     */
+    public String getConstraint() {
+        return this.constraint;
+    }
+
+    public List getConstraints(){
+        return this.constraints;
+    }
+
+    public Map<String,String> getCustomMIPs() {
+        return this.customMIPs;
+    }
+
+    /**
+     * Returns the <code>p3ptype</code> attribute.
+     *
+     * @return the <code>p3ptype</code> attribute.
+     * @deprecated deprecated without replacement
+     */
+    public String getP3PType() {
+        return this.p3ptype;
+    }
+
+    /**
+     * Returns the set of all node names referenced by the <code>readonly</code> expression.
+     *
+     * @return the set of all node names referenced by the <code>readonly</code> expression.
+     */
+    public Set getReadonlyReferences() {
+        return this.readonlyReferences;
+    }
+
+    /**
+     * Returns the set of all node names referenced by the <code>required</code> expression.
+     *
+     * @return the set of all node names referenced by the <code>required</code> expression.
+     */
+    public Set getRequiredReferences() {
+        return this.requiredReferences;
+    }
+
+    /**
+     * Returns the set of all node names referenced by the <code>relevant</code> expression.
+     *
+     * @return the set of all node names referenced by the <code>relevant</code> expression.
+     */
+    public Set getRelevantReferences() {
+        return this.relevantReferences;
+    }
+
+    /**
+     * Returns the set of all node names referenced by the <code>calculate</code> expression.
+     *
+     * @return the set of all node names referenced by the <code>calculate</code> expression.
+     */
+    public Set getCalculateReferences() {
+        return this.calculateReferences;
+    }
+    /**
+     * Returns the set of all node names referenced by the <code>constraint</code> expression.
+     *
+     * @return the set of all node names referenced by the <code>constraint</code> expression.
+     */
+    public Set getConstraintReferences() {
+        return this.constraintReferences;
+    }
+
+    public Set getCustomMIPReferences(String customMIP) {
+        return this.customMIPReferences.get(customMIP);
+    }
+
+    public Map<String, Set> getCustomMIPsReferences() {
+        return this.customMIPReferences;
+    }
+
+
+
+    /**
+     * Initializes all bound model items.
+     *
+     * @throws XFormsException if any error occured during model item init.
+     */
+    protected void initializeModelItems() throws XFormsException {
+        String bindingExpression = getBindingExpression();
+        Instance instance;
+
+        // bindingExpression starts with 'instance' function
+        if (bindingExpression != null && bindingExpression.startsWith("instance(")) {
+            this.instanceId = XPathParseUtil.getInstanceParameter(bindingExpression);
+        }
+        // else - even if there's no binding expression at all the default instance is always the default ;)
+        instance = getModel().getInstance(instanceId);
+
+
+        List nodeset = this.nodeset;
+        if (nodeset != null && nodeset.size() > 0) {
+            /*
+            * iterateModelItems lazily creates ModelItem object on the fly but they are not yet initialized.
+            * This happens later during recalculation.
+            */
+            Iterator iterator = instance.iterateModelItems(nodeset, false);
+            if (iterator != null) {
+                ModelItem modelItem;
+                while (iterator.hasNext()) {
+                    modelItem = (ModelItem) iterator.next();
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug(this + " init: model item for " + DOMUtil.getCanonicalPath((Node) modelItem.getNode()));
+                    }
+
+                    // 4.2.1 - 4.b applying model item properties to each node
+                    initializeModelItemProperties(modelItem);
+
+
+                }
+            }
+        }
+    }
+
+    public List<ModelItem> getModelItems(){
+        return this.modelItems;
+
+/*
+        Instance inst = this.model.getInstance(this.instanceId);
+
+        List result = new ArrayList();
+        Iterator iterator = inst.iterateModelItems(nodeset, false);
+        if (iterator != null) {
+            ModelItem modelItem;
+            while (iterator.hasNext()) {
+                modelItem = (ModelItem) iterator.next();
+                result.add(modelItem);
+            }
+        }
+        return result;
+*/
+    }
+
+    /**
+     * Initializes the DeclarationView for Bind object. Also picks up
+     * all references the different mips have to other binds.
+     *
+     * @param item the model item.
+     * @throws XFormsException if any error occured during model item properties init.
+     */
+    protected void initializeModelItemProperties(ModelItem item) throws XFormsException {
+        DeclarationView declaration = item.getDeclarationView();
+
+        LOGGER.warn("type checking still not working");
+
+/*
+        if (this.type != null) {
+            if (declaration.getDatatype() != null) {
+                throw new XFormsException("BINDING-EXCEPTION: property 'type' already present at model item", null, this.id);
+            }
+
+            if (!this.model.getValidator().isSupported(this.type)) {
+                throw new XFormsException("BINDING-EXCEPTION: datatype '" + this.type + "' is not supported", null, this.id);
+            }
+            if (!this.model.getValidator().isKnown(this.type)) {
+                throw new XFormsException("BINDING-EXCEPTION: datatype '" + this.type + "' is unknown", null, this.id);
+            }
+
+            declaration.setDatatype(this.type);
+        }
+*/
+
+        if (this.readonly != null) {
+            if (declaration.getReadonly() != null) {
+                this.readonly = declaration.getReadonly() + " " + COMBINE_ONE + " " + this.readonly;
+//                throw new XFormsBindingException("property 'readonly' already present at model item", this.target, this.id);
+            }
+            this.readonlyReferences = this.referenceFinder.getReferences(this.readonly, getPrefixMapping(), this.model);
+            declaration.setReadonly(this.readonly);
+        }
+
+        if (this.required != null) {
+            if (declaration.getRequired() != null) {
+                this.required = declaration.getRequired() + " " + COMBINE_ONE + " " + this.required;
+//                throw new XFormsBindingException("property 'required' already present at model item", this.target, this.id);
+            }
+            this.requiredReferences = this.referenceFinder.getReferences(this.required, getPrefixMapping(), this.model);
+            declaration.setRequired(this.required);
+        }
+
+        if (this.relevant != null) {
+            if (declaration.getRelevant() != null) {
+                this.relevant = declaration.getRelevant() + " " + COMBINE_ONE + " " + this.relevant;
+//                throw new XFormsBindingException("property 'relevant' already present at model item", this.target, this.id);
+            }
+            this.relevantReferences = this.referenceFinder.getReferences(this.relevant, getPrefixMapping(), this.model);
+            declaration.setRelevant(this.relevant);
+        }
+
+        if (this.calculate != null) {
+            if (declaration.getCalculate() != null) {
+                throw new XFormsException("BINDING-EXCEPTION: property 'calculate' already present at model item", null, this.id);
+            }
+
+            declaration.setCalculate(this.calculate);
+        }
+
+        //should be: declaration.addConstraint(this.
+//        if(this.constraints.size() != 0){
+//
+//        }
+        if (this.constraint != null) {
+            if (declaration.getConstraint() != null) {
+                /* TODO ADAPT ME TO LIST ME*/
+                this.constraint = declaration.getConstraint() + " " + COMBINE_ALL + " " + this.constraint;
+            }
+
+            /* TODO REMOVE ME*/
+            declaration.setConstraint(this.constraint);
+            declaration.setConstraints(this.constraints);
+        }
+
+        if (this.p3ptype != null) {
+            if (declaration.getP3PType() != null) {
+                throw new XFormsException("BINDING-EXCEPTION: property 'p3ptype' already present at model item", null, this.id);
+            }
+
+            declaration.setP3PType(this.p3ptype);
+        }
+//        this.modelItems.add(item);
+
+        updateXPathContext();
+
+    }
+
+
+    /**
+     * Updates the childEvaluationContext
+     *
+     * @throws XFormsException in case an XPathException happens during evaluation
+     */
+    public void updateXPathContext() throws XFormsException {
+
+        List inscopeContext = BindUtil.evalInScopeContext(this.model, this.getElement());
+
+        // if(LOGGER.isDebugEnabled()){
+        // NodeWrapper info = (NodeWrapper) parentNodeset.get(0);
+        // LOGGER.debug(this + " bound to Node:" + info.getUnderlyingNode());
+        // LOGGER.debug("in scope xpath context for " + this + " = " +
+        // BindingResolver.getExpressionPath(this,repeatItemId));
+        // }
+
+        final String relativeExpr = getBindingExpression();
+        if (relativeExpr != null) {
+            if (this.nodeset == null) {
+                this.nodeset = new ArrayList();
+            } else {
+                // When rebuild is called we should clear the list before adding all the nodes again.
+                this.nodeset.clear();
+            }
+            for (int i = 0; i < inscopeContext.size(); ++i) {
+                this.nodeset.addAll(XPathCache.getInstance().evaluate(inscopeContext, i + 1, relativeExpr, getPrefixMapping(), xpathFunctionContext));
+            }
+        } else {
+            this.nodeset = inscopeContext;
+        }
+    }
+
+
+
+
+
+    /**
+     * Returns the binding expression.
+     *
+     * @return the binding expression.
+     */
+    public String getBindingExpression() {
+        if (this.element.hasAttribute("ref")) {
+            return this.element.getAttribute("ref");
+        }
+        return this.element.getAttribute("set");
+    }
+
+    public String getInstanceId() {
+        return instanceId;
+    }
+
+    @Override
+    public void dispose() throws XFormsException {
+    }
+
+    @Override
+    protected Log getLogger() {
+        return LOGGER;
+    }
+
+
+    public void setReferenceFinder(BindFunctionReferenceFinderImpl bindFunctionReferenceFinder) {
+        this.referenceFinder = bindFunctionReferenceFinder;
+    }
+
 
     private String getMIP(short MIPType){
         String s=null;
@@ -467,7 +679,8 @@ public class Bind extends XFormsElement {
 
 
 
-    private Map getPrefixMapping() {
+    public Map getPrefixMapping() {
+//        return Collections.unmodifiableMap(prefixMapping);
         return this.prefixMapping;
     }
 
@@ -487,7 +700,6 @@ public class Bind extends XFormsElement {
         }
         return customMIPAttributes;
     }
-
 
 }
 

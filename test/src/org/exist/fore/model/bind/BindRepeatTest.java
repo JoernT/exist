@@ -18,70 +18,49 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-package org.exist.fore.model;
+package org.exist.fore.model.bind;
 
 import junit.framework.TestCase;
 import net.sf.saxon.dom.DOMNodeWrapper;
-import org.exist.fore.XFormsException;
+import org.exist.fore.model.Model;
 import org.exist.fore.model.constraints.ModelItem;
 import org.exist.fore.util.DOMUtil;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
-import java.util.Iterator;
 import java.util.List;
 
-import static org.junit.Assert.*;
-
-public class InstanceTest extends TestCase {
+public class BindRepeatTest extends TestCase {
     private Document doc;
     private Model model;
 
     @Before
     public void setUp() throws Exception {
-        String path = getClass().getResource("simple.html").getPath();
-        String fileURI = "file://" + path.substring(0, path.lastIndexOf("simple.html"));
+        String path = getClass().getResource("bindrepeat.html").getPath();
+        String fileURI = "file://" + path.substring(0, path.lastIndexOf("bindrepeat.html"));
 
         doc = DOMUtil.parseXmlFile(path,true,false);
 //        DOMUtil.prettyPrintDOM(doc);
 
         model = new Model(this.doc.getDocumentElement());
         model.init();
+
     }
 
-/*
-    public void createModelItem() {
+    @After
+    public void tearDown() throws Exception {
     }
-*/
 
     @Test
-    public void testGetInstanceDocument() {
-        DOMUtil.prettyPrintDOM(this.model.getDefaultInstance().getInstanceDocument());
-    }
+    public void testInit() {
 
-    public void testGetModelItem() throws XFormsException {
-        Instance i = model.getDefaultInstance();
-
-        Iterator iterator = i.iterateModelItems();
-        if (iterator != null) {
-            ModelItem modelItem;
-            while (iterator.hasNext()) {
-                modelItem = (ModelItem) iterator.next();
-
-                assertNotNull(modelItem);
-            }
-        }
+        assertEquals(4,this.model.getModelBindings().size());
 
 
     }
 
-    public void testGetInstanceNodeset() {
-        List l = this.model.getDefaultInstance().getInstanceNodeset();
-        DOMNodeWrapper wrapper = (DOMNodeWrapper) l.get(0);
-        Node n = (Node) wrapper.getUnderlyingNode();
-        DOMUtil.prettyPrintDOM(n);
-        assertNotNull(l);
-    }
 }

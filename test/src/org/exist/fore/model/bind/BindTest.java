@@ -21,16 +21,21 @@
 package org.exist.fore.model.bind;
 
 import junit.framework.TestCase;
+import net.sf.saxon.dom.DOMNodeWrapper;
+import org.exist.fore.model.constraints.ModelItem;
 import org.exist.fore.util.DOMUtil;
 import org.exist.fore.model.Model;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 
 import java.util.List;
+import java.util.Set;
 
-public class BindUtilTest extends TestCase {
+public class BindTest extends TestCase {
     private Document doc;
     private Model model;
 
@@ -54,20 +59,43 @@ public class BindUtilTest extends TestCase {
     @Test
     public void testInit() {
 
-        assertEquals(4,this.model.getModelBindings().size());
+        assertEquals(8,this.model.getModelBindings().size());
         assertEquals("item1",((Bind)this.model.getModelBindings().get(0)).getElement().getAttribute("id"));
         assertEquals("item2",((Bind)this.model.getModelBindings().get(1)).getElement().getAttribute("id"));
         assertEquals("item3",((Bind)this.model.getModelBindings().get(2)).getElement().getAttribute("id"));
 
+        // first model binding points to 'item1'
         List nl = ((Bind)this.model.getModelBindings().get(0)).nodeset;
+        Object o = nl.get(0);
+        Node n = (Node) ((DOMNodeWrapper)nl.get(0)).getUnderlyingNode();
+        assertEquals("item1",n.getNodeName());
 
-        assertEquals("item1",nl);
+        // first model binding points to 'thing'
+        nl = ((Bind)this.model.getModelBindings().get(3)).nodeset;
+        n = (Node) ((DOMNodeWrapper)nl.get(0)).getUnderlyingNode();
+        assertEquals("thing",n.getNodeName());
+
+        // test for bind required attribute value
+        Bind b = (Bind) this.model.getModelBindings().get(0);
+        String s = b.getRequired();
+        assertEquals("true()", s);
+
+        // test for value 'ITEM2'
+        nl = ((Bind)this.model.getModelBindings().get(1)).nodeset;
+        n = (Node) ((DOMNodeWrapper)nl.get(0)).getUnderlyingNode();
+        assertEquals("ITEM2",DOMUtil.getElementValue((Element) n));
+
 
     }
 
     public void testInitializeModelItems(){
         assertEquals( ((Bind)this.model.getModelBindings().get(0)).getInstanceId(),"default");
-        assertEquals( ((Bind)this.model.getModelBindings().get(3)).getInstanceId(),"'other'");
+
+        ModelItem m = ((Bind)this.model.getModelBindings().get(0)).getModelItems().get(0);
+
+        assertTrue(m.getRefreshView().isRequiredMarked());
+
+        assertEquals( "other", ((Bind)this.model.getModelBindings().get(3)).getInstanceId());
 
     }
 }

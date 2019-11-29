@@ -5,6 +5,7 @@
 
 package org.exist.fore.xpath;
 
+import net.sf.saxon.expr.Container;
 import org.exist.fore.model.Model;
 import net.sf.saxon.dom.DOMNodeWrapper;
 import net.sf.saxon.expr.XPathContext;
@@ -26,13 +27,13 @@ public abstract class XFormsFunction extends SystemFunctionCall {
      * @param xpathContext
      * @return
      */
-/*
     protected XPathFunctionContext getFunctionContext(XPathContext xpathContext) {
-        XPathFunctionContext functionContext = (XPathFunctionContext) xpathContext.getController().getUserData(XFormsProcessorImpl.class.toString(),
+        XPathFunctionContext functionContext = (XPathFunctionContext) xpathContext.getController().getUserData(Model.class.toString(),
                 XPathFunctionContext.class.toString());
+
+//        XPathFunctionContext functionContext =  new XPathFunctionContext()
         return functionContext;
     }
-*/
 
 //    /**
 //     * Determine which aspects of the context the expression depends on. The result is
@@ -47,9 +48,7 @@ public abstract class XFormsFunction extends SystemFunctionCall {
 //                 StaticProperty.DEPENDS_ON_LAST );
 //     }
 
-/*
     protected Container getContainer(XPathContext xpathContext) {
-//    protected Model getContainer(XPathContext xpathContext) {
         Item item = xpathContext.getContextItem();
         Node n = (Node) ((DOMNodeWrapper) item).getUnderlyingNode();
         if (LOGGER.isDebugEnabled()) {
@@ -64,5 +63,4 @@ public abstract class XFormsFunction extends SystemFunctionCall {
             return null;
         }
     }
-*/
 }

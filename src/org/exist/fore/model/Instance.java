@@ -8,6 +8,8 @@ package org.exist.fore.model;
 import net.sf.saxon.trans.XPathException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.exist.fore.model.constraints.ElementItem;
+import org.exist.fore.model.constraints.NodeItem;
 import org.exist.fore.util.DOMUtil;
 import org.exist.fore.XFormsException;
 import org.exist.fore.model.constraints.ModelItem;
@@ -49,10 +51,10 @@ public class Instance {
         String id = Model.generateModelItemId();
         ModelItem modelItem;
         if (node.getNodeType() == Node.ELEMENT_NODE) {
-            modelItem = new XercesElementImpl(id);
+            modelItem = new ElementItem(id);
         }
         else {
-            modelItem = new XercesNodeImpl(id);
+            modelItem = new NodeItem(id);
         }
         modelItem.setNode(node);
 
@@ -95,6 +97,8 @@ public class Instance {
         if(this.element.getAttribute("id").equals("")){
             this.element.setAttribute("id","default");
         }
+
+        DOMUtil.prettyPrintDOM(this.element);
         storeUserObjects();
 
 //        initXPathContext();
@@ -168,10 +172,10 @@ public class Instance {
         String id = Model.generateModelItemId();
         ModelItem modelItem;
         if (node.getNodeType() == Node.ELEMENT_NODE) {
-            modelItem = new XercesElementImpl(id);
+            modelItem = new ElementItem(id);
         }
         else {
-            modelItem = new XercesNodeImpl(id);
+            modelItem = new NodeItem(id);
         }
         modelItem.setNode(node);
 

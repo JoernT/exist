@@ -1,13 +1,29 @@
 /*
- * Copyright (c) 2012. betterFORM Project - http://www.betterform.de
- * Licensed under the terms of BSD License
+ * eXist Open Source Native XML Database
+ * Copyright (C) 2001-2019 The eXist Project
+ * http://exist-db.org
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-package org.exist.fore.model;
+package org.exist.fore.model.constraints;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.exist.fore.model.constraints.*;
+import org.exist.fore.model.Instance;
+import org.exist.fore.model.Model;
 import org.exist.fore.model.constraints.impl.DeclarationViewImpl;
 import org.exist.fore.model.constraints.impl.LocalUpdateViewImpl;
 import org.exist.fore.model.constraints.impl.RefreshViewImpl;
@@ -24,8 +40,8 @@ import java.util.Map;
  * @author Ulrich Nicolas Liss&eacute;
  * @version $Id: XercesNodeImpl.java 2354 2006-10-04 18:41:48Z unl $
  */
-class XercesNodeImpl implements ModelItem {
-    protected static Log LOGGER = LogFactory.getLog(XercesNodeImpl.class);
+public class NodeItem implements ModelItem {
+    protected static Log LOGGER = LogFactory.getLog(NodeItem.class);
 
     private String id;
     protected Node node;
@@ -42,7 +58,7 @@ class XercesNodeImpl implements ModelItem {
      *
      * @param id the id of this model item.
      */
-    public XercesNodeImpl(String id) {
+    public NodeItem(String id) {
         this.id = id;
         this.declarationView = new DeclarationViewImpl();
         this.localUpdateView = new LocalUpdateViewImpl();

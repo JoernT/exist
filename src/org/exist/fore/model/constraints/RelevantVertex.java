@@ -51,7 +51,7 @@ public class RelevantVertex extends Vertex {
      */
     public void compute() throws XFormsException {
         boolean result = XPathCache.getInstance().evaluateAsBoolean(relativeContext, "boolean(" + this.xpathExpression + ")");
-        ModelItem modelItem = (ModelItem) this.instanceNode.getUserData("");
+        ModelItem modelItem = (ModelItem) this.instanceNode.getUserData("modelItem");
         modelItem.getLocalUpdateView().setLocalRelevant(result);
         if(result){
             modelItem.getRefreshView().setEnabledMarker();

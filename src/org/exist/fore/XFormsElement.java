@@ -62,6 +62,8 @@ public abstract class XFormsElement {
         this.element = element;
 
         xpathFunctionContext = new XPathFunctionContext(this);
+        String name = element.getNodeName();
+        element.setUserData(name, this,null);
 
     }
 
@@ -264,11 +266,10 @@ public abstract class XFormsElement {
     /**
      * @return the the XPathFunctionContext for this element.
      */
-/*
     public XPathFunctionContext getXPathFunctionContext() {
         return xpathFunctionContext;
     }
-*/
+
 
     // id handling
 

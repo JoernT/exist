@@ -6,9 +6,13 @@
 package org.exist.fore.model.constraints;
 
 import org.exist.fore.XFormsException;
+import org.exist.fore.model.Instance;
+import org.exist.fore.model.Model;
+import org.exist.fore.model.bind.Bind;
 import org.exist.fore.xpath.BetterFormXPathContext;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.exist.fore.xpath.XPathUtil;
 import org.w3c.dom.Node;
 
 import java.util.*;
@@ -16,7 +20,6 @@ import java.util.*;
 /**
  * Implementation of XForms recalculation.
  *
- * Todo: The Dependency Engine desperately needs refactoring, then tuning.
  *
  * @author This code is based on the ideas of Mikko Honkala from the X-Smiles project.
  *         Although it has been heavily refactored and rewritten to meet our needs.
@@ -40,6 +43,83 @@ public class MainDependencyGraph extends DependencyGraph {
      */
     public Vector getVertices() {
         return this.vertices;
+    }
+
+    /**
+     * builds the dependency graph for a single Bind. Processes all instancenodes that are associated with
+     * the bind and creates one Vertex-object for every Modelitem Property found. That means that if there are
+     * two instancenodes in the evaluated nodeset, two Vertices for every property (readonly, required, relevant,
+     * constraint, calculate) will be created.
+     * <p/>
+     * Note: only dynamic Modelitem Properties will be processed.
+     */
+    public void buildBindGraph(Bind bind, Model model) throws XFormsException {
+        Instance instance = model.getInstance(bind.getInstanceId());
+
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("buildBindGraph: building " + bind);
+        }
+
+
+        final List nodeset = bind.getNodeset();
+        for (int i = 0; i < nodeset.size(); i++) {
+            BetterFormXPathContext relativeContext = new BetterFormXPathContext(nodeset, i + 1, bind.getPrefixMapping(), bind.getXPathFunctionContext());
+            Node node = XPathUtil.getAsNode(nodeset, i + 1);
+//            ModelItem modelItem = instance.getModelItem(node);
+            ModelItem modelItem = bind.getModelItems().get(i);
+
+
+            String property = bind.getCalculate();
+            if (property != null  && property.length() != 0) {
+                modelItem.getDeclarationView().setCalculate(property);
+                this.addReferredNodesToGraph(relativeContext, node, property, Vertex.CALCULATE_VERTEX, bind.getCalculateReferences());
+            }
+
+            property = bind.getRelevant();
+            if (property != null  && property.length() != 0) {
+                modelItem.getDeclarationView().setRelevant(property);
+                this.addReferredNodesToGraph(relativeContext, node, property, Vertex.RELEVANT_VERTEX, bind.getRelevantReferences());
+            }
+
+            property = bind.getReadonly();
+            if (property != null  && property.length() != 0) {
+                modelItem.getDeclarationView().setReadonly(property);
+                this.addReferredNodesToGraph(relativeContext, node, property, Vertex.READONLY_VERTEX, bind.getReadonlyReferences());
+            }
+
+            property = bind.getRequired();
+            if (property != null  && property.length() != 0) {
+                modelItem.getDeclarationView().setRequired(property);
+                this.addReferredNodesToGraph(relativeContext, node, property, Vertex.REQUIRED_VERTEX, bind.getRequiredReferences());
+            }
+
+            property = bind.getConstraint();
+            if (property != null  && property.length() != 0) {
+                List constraints = bind.getConstraints();
+                modelItem.getDeclarationView().setConstraints(constraints);
+                modelItem.getDeclarationView().setConstraint(property);
+                this.addReferredNodesToGraph(relativeContext, node, property, Vertex.CONSTRAINT_VERTEX, bind.getConstraintReferences());
+            }
+
+            //RKU
+            //property = bind.getCustomMIPs();
+/*
+            Map<String, String> customMIPs = bind.getCustomMIPs();
+            if (!customMIPs.isEmpty()) {
+                modelItem.getDeclarationView().setCustomMIPs(customMIPs);
+                for (String key : customMIPs.keySet()) {
+
+                    this.addReferredNodesToGraph(relativeContext, node, customMIPs.get(key), Vertex.CUSTOM_VERTEX, bind.getCustomMIPReferences(key), key);
+                }
+            }
+*/
+
+            property = bind.getDatatype();
+            if (property != null  && property.length() != 0) {
+                modelItem.getDeclarationView().setDatatype(property);
+            }
+
+        }
     }
 
     /**
@@ -113,85 +193,6 @@ public class MainDependencyGraph extends DependencyGraph {
         }
     }
 
-    /**
-     * builds the dependency graph for a single Bind. Processes all instancenodes that are associated with
-     * the bind and creates one Vertex-object for every Modelitem Property found. That means that if there are
-     * two instancenodes in the evaluated nodeset, two Vertices for every property (readonly, required, relevant,
-     * constraint, calculate) will be created.
-     * <p/>
-     * Note: only dynamic Modelitem Properties will be processed.
-     */
-/*
-    public void buildBindGraph(Bind bind, Model model) throws XFormsException {
-        Instance instance = model.getInstance(bind.getInstanceId());
-
-        if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("buildBindGraph: building " + bind);
-        }
-
-        
-        final List nodeset = bind.getNodeset();
-        for (int i = 0; i < nodeset.size(); i++) {
-            BetterFormXPathContext relativeContext = new BetterFormXPathContext(nodeset, i + 1, bind.getPrefixMapping(), bind.getXPathFunctionContext());
-            Node node = XPathUtil.getAsNode(nodeset, i + 1);
-            ModelItem modelItem = instance.getModelItem(node);
-            
-
-            String property = bind.getCalculate();
-            if (property != null) {
-                modelItem.getDeclarationView().setCalculate(property);
-                this.addReferredNodesToGraph(relativeContext, node, property, Vertex.CALCULATE_VERTEX, bind.getCalculateReferences());
-            }
-
-            property = bind.getRelevant();
-            if (property != null) {
-                modelItem.getDeclarationView().setRelevant(property);
-                this.addReferredNodesToGraph(relativeContext, node, property, Vertex.RELEVANT_VERTEX, bind.getRelevantReferences());
-            }
-
-            property = bind.getReadonly();
-            if (property != null) {
-                modelItem.getDeclarationView().setReadonly(property);
-                this.addReferredNodesToGraph(relativeContext, node, property, Vertex.READONLY_VERTEX, bind.getReadonlyReferences());
-            }
-
-            property = bind.getRequired();
-            if (property != null) {
-                modelItem.getDeclarationView().setRequired(property);
-                this.addReferredNodesToGraph(relativeContext, node, property, Vertex.REQUIRED_VERTEX, bind.getRequiredReferences());
-            }
-
-            property = bind.getConstraint();
-            if (property != null) {
-                List constraints = bind.getConstraints();
-                modelItem.getDeclarationView().setConstraints(constraints);
-                modelItem.getDeclarationView().setConstraint(property);
-                this.addReferredNodesToGraph(relativeContext, node, property, Vertex.CONSTRAINT_VERTEX, bind.getConstraintReferences());
-            }
-            
-            //RKU
-            //property = bind.getCustomMIPs();
-            Map<String, String> customMIPs = bind.getCustomMIPs();
-            if (!customMIPs.isEmpty()) {
-            	modelItem.getDeclarationView().setCustomMIPs(customMIPs);
-            	for (String key : customMIPs.keySet()) {
-                    
-                    this.addReferredNodesToGraph(relativeContext, node, customMIPs.get(key), Vertex.CUSTOM_VERTEX, bind.getCustomMIPReferences(key), key);
-				}
-            }
-
-            property = bind.getDatatype();
-            if (property != null) {
-                modelItem.getDeclarationView().setDatatype(property);
-            }
-
-            property = bind.getP3PType();
-            if (property != null) {
-                modelItem.getDeclarationView().setP3PType(property);
-            }
-        }
-    }
-*/
 
     /**
      * Extends DependencyGraph.recalculate(). Restores the vertices vector after recalc

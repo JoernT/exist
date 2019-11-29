@@ -43,7 +43,10 @@ public class BindUtil {
 //        Element parentBind = (Element) bind.getParentNode();
         Element parentBind = getParentBind(bind);
         if(parentBind != null){
-            resultNodeset = (List) parentBind.getUserData("boundNodes");
+//            resultNodeset = (List) parentBind.getUserData("boundNodes");
+            Bind b = (Bind) parentBind.getUserData("xf-bind");
+            resultNodeset = (List) b.getNodeset();
+//            resultNodeset = (List) parentBind.;
         }else if( BindUtil.hasAbsoluteBinding(bind)){
             String instanceId = XPathParseUtil.getInstanceParameter(BindUtil.getBindExpr(bind));
             resultNodeset = model.getInstance(instanceId).getInstanceNodeset();

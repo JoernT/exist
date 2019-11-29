@@ -70,7 +70,7 @@ public class CustomVertex extends Vertex {
 		String result = XPathCache.getInstance().evaluateAsString(relativeContext,
 				"string(" + this.xpathExpression + ")");
 
-		ModelItem modelItem = (ModelItem) this.instanceNode.getUserData("");
+		ModelItem modelItem = (ModelItem) this.instanceNode.getUserData("modelItem");
 		modelItem.getLocalUpdateView().getCustomMIPValues().put(prefix, result);	
 
 //		if (result) {

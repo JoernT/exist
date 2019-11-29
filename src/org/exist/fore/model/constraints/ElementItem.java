@@ -1,9 +1,24 @@
 /*
- * Copyright (c) 2012. betterFORM Project - http://www.betterform.de
- * Licensed under the terms of BSD License
+ * eXist Open Source Native XML Database
+ * Copyright (C) 2001-2019 The eXist Project
+ * http://exist-db.org
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-package org.exist.fore.model;
+package org.exist.fore.model.constraints;
 
 import org.exist.fore.xpath.NamespaceConstants;
 import org.w3c.dom.Element;
@@ -16,7 +31,7 @@ import org.w3c.dom.NodeList;
  * @author Ulrich Nicolas Liss&eacute;
  * @version $Id: XercesElementImpl.java 2354 2006-10-04 18:41:48Z unl $
  */
-class XercesElementImpl extends XercesNodeImpl {
+public class ElementItem extends NodeItem {
 
     private Element element;
 
@@ -25,7 +40,7 @@ class XercesElementImpl extends XercesNodeImpl {
      *
      * @param id the id of this model item.
      */
-    public XercesElementImpl(String id) {
+    public ElementItem(String id) {
         super(id);
     }
 

@@ -5,27 +5,21 @@
 
 package org.exist.fore.xpath;
 
-import org.exist.fore.xpath.NamespaceConstants;
 import net.sf.saxon.expr.StaticProperty;
-import net.sf.saxon.functions.*;
 import net.sf.saxon.functions.Compare;
-import net.sf.saxon.pattern.NodeKindTest;
+import net.sf.saxon.functions.StandardFunction;
 import net.sf.saxon.type.BuiltInAtomicType;
 import net.sf.saxon.type.ItemType;
 import net.sf.saxon.type.Type;
 import net.sf.saxon.value.Int64Value;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.exist.fore.xpath.Instance;
 
 import java.lang.reflect.Field;
 import java.util.Map;
 
-import static net.sf.saxon.functions.StandardFunction.BASE;
-import static net.sf.saxon.functions.StandardFunction.CORE;
-import static net.sf.saxon.functions.StandardFunction.DCOLL;
-import static net.sf.saxon.functions.StandardFunction.ONE;
-import static net.sf.saxon.functions.StandardFunction.OPT;
-import static net.sf.saxon.functions.StandardFunction.STAR;
+import static net.sf.saxon.functions.StandardFunction.*;
 
 /**
  * This class contains static data tables defining the properties of XForms functions. "XForms functions" here means the
@@ -60,10 +54,8 @@ public class XFormsFunctionLibrary extends XPathFunctionLibrary {
             .arg(2, BuiltInAtomicType.STRING, ONE, null);
 
 
-/*
         registerXf("instance", Instance.class, 0, 0, 1, Type.ITEM_TYPE, ONE, CORE, 0)
             .arg(0, BuiltInAtomicType.STRING, ONE, null);
-*/
 
 /*
         registerXf("index", Index.class, 0, 1, 1, BuiltInAtomicType.NUMERIC, ONE, CORE, 0)

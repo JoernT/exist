@@ -55,7 +55,7 @@ public class ConstraintVertex extends Vertex {
      */
     public void compute() throws XFormsException {
 
-        ModelItem modelItem = (ModelItem) this.instanceNode.getUserData("");
+        ModelItem modelItem = (ModelItem) this.instanceNode.getUserData("modelItem");
         DeclarationView declarationView = modelItem.getDeclarationView();
 
         boolean finalResult=true;

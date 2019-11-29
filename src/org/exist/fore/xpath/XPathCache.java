@@ -23,6 +23,7 @@ import net.sf.saxon.sxpath.IndependentContext;
 import net.sf.saxon.trans.XPathException;
 import net.sf.saxon.tree.iter.LookaheadIterator;
 import net.sf.saxon.xpath.XPathFunctionLibrary;
+import org.exist.fore.model.Model;
 import org.w3c.dom.Node;
 
 import java.util.*;
@@ -140,7 +141,7 @@ public class XPathCache {
             nodesetIt.next();
             context.getXPathContextObject().setCurrentIterator(nodesetIt);
             // todo: ??? really needed ?
-//            context.getXPathContextObject().getController().setUserData(XFormsProcessorImpl.class.toString(), XPathFunctionContext.class.toString(), functionContext);
+            context.getXPathContextObject().getController().setUserData(Model.class.toString(), XPathFunctionContext.class.toString(), functionContext);
 
             SequenceIterator it = exp.iterate(context);
 
