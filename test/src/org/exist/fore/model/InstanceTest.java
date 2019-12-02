@@ -28,6 +28,7 @@ import org.exist.fore.util.DOMUtil;
 import org.junit.Before;
 import org.junit.Test;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 import java.util.Iterator;
@@ -45,7 +46,6 @@ public class InstanceTest extends TestCase {
         String fileURI = "file://" + path.substring(0, path.lastIndexOf("simple.html"));
 
         doc = DOMUtil.parseXmlFile(path,true,false);
-//        DOMUtil.prettyPrintDOM(doc);
 
         model = new Model(this.doc.getDocumentElement());
         model.init();
@@ -56,9 +56,32 @@ public class InstanceTest extends TestCase {
     }
 */
 
+    public void testGetInitialInstance() {
+        Document initial = this.model.getDefaultInstance().getInitialInstance();
+        assertTrue(initial instanceof Document);
+        assertNotNull(initial.getDocumentElement().getElementsByTagName("greeting"));
+    }
+
+
     @Test
     public void testGetInstanceDocument() {
-        DOMUtil.prettyPrintDOM(this.model.getDefaultInstance().getInstanceDocument());
+        assertTrue(this.model.getDefaultInstance() instanceof Instance);
+        assertTrue(this.model.getDefaultInstance().getInstanceDocument() instanceof Document);
+    }
+
+    public void testGetDefaultInstance(){
+        assertNotNull(this.model.getDefaultInstance());
+        assertTrue(this.model.getDefaultInstance() instanceof Instance);
+        assertEquals("default",this.model.getDefaultInstance().getId());
+    }
+
+    public void testStoredObjects(){
+        Element root = this.model.getDefaultInstance().getInstanceDocument().getDocumentElement();
+        assertNotNull(root.getUserData("model"));
+        assertTrue(root.getUserData("model") instanceof Model);
+
+        assertNotNull(root.getUserData("instance"));
+        assertTrue(root.getUserData("instance") instanceof Instance);
     }
 
     public void testGetModelItem() throws XFormsException {
@@ -73,15 +96,13 @@ public class InstanceTest extends TestCase {
                 assertNotNull(modelItem);
             }
         }
-
-
     }
 
     public void testGetInstanceNodeset() {
         List l = this.model.getDefaultInstance().getInstanceNodeset();
         DOMNodeWrapper wrapper = (DOMNodeWrapper) l.get(0);
         Node n = (Node) wrapper.getUnderlyingNode();
-        DOMUtil.prettyPrintDOM(n);
         assertNotNull(l);
+        assertEquals("data",n.getNodeName());
     }
 }

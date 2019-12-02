@@ -9,7 +9,6 @@ package org.exist.fore.model;
 //import com.fasterxml.jackson.core.JsonFactory;
 //import com.fasterxml.jackson.core.JsonGenerator;
 
-import com.fasterxml.jackson.core.JsonGenerator;
 import net.sf.saxon.Configuration;
 import net.sf.saxon.dom.DOMNodeWrapper;
 import org.apache.logging.log4j.LogManager;
@@ -30,11 +29,9 @@ import org.w3c.dom.bootstrap.DOMImplementationRegistry;
 import org.w3c.dom.ls.LSInput;
 import org.w3c.dom.ls.LSResourceResolver;
 
-import javax.json.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
-import java.io.StringWriter;
 import java.util.*;
 
 
@@ -58,6 +55,7 @@ public class Model {
 
     private List schemas;
     private static XSModel defaultSchema = null;
+    private String updates;
 //    private JsonFac#tory jsonFactory;
 //    private JsonGenerator jsonGenerator;
 //    private StringWriter jsonWriter;
@@ -87,28 +85,12 @@ public class Model {
 
 //        this.updateSequencer = new UpdateSequencer(this);
         try {
-//            this.jsonFactory = new JsonFactory();
-//            this.jsonWriterFactory = Json.createWriterFactory();
-//            this.jsonWriter = new StringWriter();
-//            this.jsonGenerator = Json.createWr(this.jsonWriter);
-            modelConstruct();
-        } catch (XFormsException e) {
-            e.printStackTrace();
-            // todo: return error log as JSON
-        }
-    }
-
-
-    /**
-     * Implements <code>xforms-model-construct</code> default action.
-     */
-    private void modelConstruct() throws XFormsException, IOException {
-        // load schemas
+            // load schemas
 //        this.schemas = new ArrayList();
 //        loadDefaultSchema(this.schemas);
 
-        // The default schema is shared between all models of all forms, and isn't thread safe, so we need synchronization here.
-        // We cache the default model bcz. it takes quite some time to construct it.
+            // The default schema is shared between all models of all forms, and isn't thread safe, so we need synchronization here.
+            // We cache the default model bcz. it takes quite some time to construct it.
 /*
         synchronized (Model.class) {
             // set datatypes for validation
@@ -117,33 +99,40 @@ public class Model {
 */
 
 
-        // build instances
-        this.instances = new ArrayList();
+            // build instances
+            this.instances = new ArrayList();
 
-        // todo: move to static method in initializer
-        List<Element> instanceElements = getAllInstanceElements();
-        int count = instanceElements.size();
+            // todo: move to static method in initializer
+            List<Element> instanceElements = getAllInstanceElements();
+            int count = instanceElements.size();
 
-        if (count > 0) {
-            for (int index = 0; index < count; index++) {
-                Element xformsInstance = instanceElements.get(index);
-                createInstanceObject(xformsInstance);
+            if (count > 0) {
+                for (int index = 0; index < count; index++) {
+                    Element xformsInstance = instanceElements.get(index);
+                    Instance instance = new Instance(xformsInstance, this);
+                    instance.init();
+                    this.instances.add(instance);
+                }
             }
-        }
 
-        // todo: initialize p3p ?
-        // initialize binds and submissions (actions should be initialized already)
+            // todo: initialize p3p ?
+            // initialize binds and submissions (actions should be initialized already)
 
-        Initializer.initializeBindElements(this, this.element, new BindFunctionReferenceFinderImpl());
+            Initializer.initializeBindElements(this, this.element, new BindFunctionReferenceFinderImpl());
 //        Initializer.initializeActionElements(this, this.element);
 //        Initializer.initializeSubmissionElements(this, this.element);
 
-        rebuild();
-        recalculate();
-        revalidate();
-        refresh();
-        this.ready = true;
+            rebuild();
+            recalculate();
+            revalidate();
+            refresh();
+            this.ready = true;
+        } catch (XFormsException e) {
+            e.printStackTrace();
+            // todo: return error log as JSON
+        }
     }
+
 
     /**
      * Generates a model item id.
@@ -256,299 +245,6 @@ public class Model {
 //            this.updateSequencer.perform();
     }
 
-
-/*
-    private void writeBinding(Bind bind) throws IOException, XFormsException {
-
-        if (bind.getElement().hasAttribute("ref")) {
-
-            //todo check if bind has multiple bind children -> make an array
-
-            this.jsonGenerator.writeStartObject();
-
-            this.jsonGenerator.writeObjectFieldStart("bind");
-
-            ModelItem m = bind.getModelItems().get(0); //there can be just one for a single node bind
-            RefreshView rv = m.getRefreshView();
-
-            this.jsonGenerator.writeStringField("id", bind.getId());
-            if (rv.isEnabledMarked()) {
-                this.jsonGenerator.writeBooleanField("relevant", true);
-            }
-            if (rv.isDisabledMarked()) {
-                this.jsonGenerator.writeBooleanField("relevant", false);
-            }
-            if (rv.isReadwriteMarked()) {
-                this.jsonGenerator.writeBooleanField("readonly", false);
-            }
-            if (rv.isReadonlyMarked()) {
-                this.jsonGenerator.writeBooleanField("readonly", true);
-            }
-            if (rv.isOptionalMarked()) {
-                this.jsonGenerator.writeBooleanField("required", false);
-            }
-            if (rv.isRequiredMarked()) {
-                this.jsonGenerator.writeBooleanField("required", true);
-            }
-            if (rv.isInvalidMarked()) {
-                this.jsonGenerator.writeBooleanField("valid", false);
-            }
-            if (rv.isValidMarked()) {
-                this.jsonGenerator.writeBooleanField("valid", true);
-            }
-            if(m.getValue().length() != 0){
-                this.jsonGenerator.writeStringField("value", m.getValue());
-            }
-
-            List children = DOMUtil.getChildElements(bind.getElement());
-            if(children.size() == 1){
-//                this.jsonGenerator.writeEndObject();
-                this.jsonGenerator.writeEndObject();
-                Bind b = (Bind) ((Element)children.get(0)).getUserData("xf-bind");
-                writeBinding(b);
-            }else{
-
-            }
-
-*/
-/*
-                    List items = bind.getModelItems();
-                    for (int i = 0; i < items.size(); i++) {
-                        ModelItem m = (ModelItem) items.get(i);
-                        System.out.println();
-                    }
-*//*
-
-
-
-            this.jsonGenerator.writeEndObject();
-
-            this.jsonGenerator.writeEndObject();
-
-        } else if (bind.getElement().hasAttribute("set")) {
-            this.jsonGenerator.writeStartObject();
-                this.jsonGenerator.writeObjectFieldStart("bind");
-                    this.jsonGenerator.writeStringField("id", bind.getId());
-                    this.jsonGenerator.writeBooleanField("sequence", true);
-
-                    this.jsonGenerator.writeArrayFieldStart("bind");
-                        this.jsonGenerator.writeStartArray();// item array
-
-
-
-                        this.jsonGenerator.writeEndArray(); //item array end
-                    this.jsonGenerator.writeEndArray();//repeat array end
-            this.jsonGenerator.writeEndObject();
-            this.jsonGenerator.writeEndObject();
-
-
-        } else {
-            throw new XFormsException("Bind has no binding expression - one of 'ref' or 'bind' are necessary");
-        }
-
-
-    }
-*/
-
-    private void writeProps(JsonObjectBuilder details, RefreshView rv) {
-        if (rv.isEnabledMarked()) {
-            details.add("relevant", true);
-        }
-        if (rv.isDisabledMarked()) {
-            details.add("relevant", false);
-        }
-        if (rv.isReadwriteMarked()) {
-            details.add("readonly", false);
-        }
-        if (rv.isReadonlyMarked()) {
-            details.add("readonly", true);
-        }
-        if (rv.isOptionalMarked()) {
-            details.add("required", false);
-        }
-        if (rv.isRequiredMarked()) {
-            details.add("required", true);
-        }
-        if (rv.isInvalidMarked()) {
-            details.add("valid", false);
-        }
-        if (rv.isValidMarked()) {
-            details.add("valid", true);
-        }
-
-    }
-
-
-    private JsonObject writeBindObject(Bind bind) throws XFormsException {
-        JsonObjectBuilder bindBuilder = Json.createObjectBuilder(); //creates outermost object for bind object
-        JsonObjectBuilder details = Json.createObjectBuilder(); // creates object to hold properties
-
-        if (bind.getElement().hasAttribute("ref")) {
-
-            // ##### ref binding #####
-            details.add("id", bind.getId()); //write "id"
-
-            ModelItem m = bind.getModelItems().get(0); //there can be just one for a single node bind
-            RefreshView rv = m.getRefreshView();
-
-            writeProps(details, rv);
-
-            if (m.getValue().length() != 0) {
-                details.add("value", m.getValue()); //write "value"
-            }
-
-            bindBuilder.add("bind", details.build());
-
-            List children = DOMUtil.getChildElements(bind.getElement());
-            if (children.size() == 1) {
-                Element childElement = (Element) children.get(0);
-                Bind childBind = (Bind) childElement.getUserData("xf-bind");
-
-                JsonObjectBuilder objectBuilder = Json.createObjectBuilder();
-
-                JsonObject co = writeBindObject(childBind);
-//                objectBuilder.add(co);
-            } else {
-                // need to create array
-                JsonArrayBuilder ab = Json.createArrayBuilder();
-
-                for (int i = 0; i < children.size(); i++) {
-                    Element childElement = (Element) children.get(0);
-                    Bind childBind = (Bind) childElement.getUserData("xf-bind");
-
-                    JsonObject co = writeBindObject(childBind);
-                    ab.add(co);
-                }
-
-            }
-
-
-        } else if (bind.getElement().hasAttribute("set")) {
-            // ##### set binding #####
-
-        } else {
-            throw new XFormsException("Bind has no binding expression - one of 'ref' or 'bind' are necessary");
-        }
-
-
-        return bindBuilder.build();
-    }
-
-    private String escapeJsonString(String raw) {
-        String escaped = raw;
-        escaped = escaped.replace("\\", "\\\\");
-        escaped = escaped.replace("\"", "\\\"");
-        escaped = escaped.replace("\b", "\\b");
-        escaped = escaped.replace("\f", "\\f");
-        escaped = escaped.replace("\n", "\\n");
-        escaped = escaped.replace("\r", "\\r");
-        escaped = escaped.replace("\t", "\\t");
-        // TODO: escape other non-printing characters using uXXXX notation
-        return escaped;
-    }
-
-    private void writeJson(Bind bind, StringBuilder builder,boolean isArray) throws XFormsException {
-
-        if (bind.getElement().hasAttribute("ref")) {
-
-            if(isArray){
-                builder.append("{");
-            }else{
-                builder.append("{\"bind\":{");
-            }
-            builder.append("\"id\":\"");
-            builder.append(bind.getId());
-            builder.append("\"");
-
-            ModelItem m = bind.getModelItems().get(0); //there can be just one for a single node bind
-            RefreshView rv = m.getRefreshView();
-
-            if (rv.isEnabledMarked()) {
-                builder.append(",");
-                builder.append("\"relevant\":");
-                builder.append("true");
-            }
-            if (rv.isDisabledMarked()) {
-                builder.append(",");
-                builder.append("\"relevant\":");
-                builder.append("false");
-            }
-            if (rv.isReadwriteMarked()) {
-                builder.append(",");
-                builder.append("\"readonly\":");
-                builder.append("false");
-            }
-            if (rv.isReadonlyMarked()) {
-                builder.append(",");
-                builder.append("\"readonly\":");
-                builder.append("true");
-            }
-            if (rv.isOptionalMarked()) {
-                builder.append(",");
-                builder.append("\"required\":");
-                builder.append("false");
-            }
-            if (rv.isRequiredMarked()) {
-                builder.append(",");
-                builder.append("\"required\":");
-                builder.append("true");
-            }
-            if (rv.isInvalidMarked()) {
-                builder.append(",");
-                builder.append("\"valid\":");
-                builder.append("false");
-            }
-
-            if (rv.isValidMarked()) {
-                builder.append(",");
-                builder.append("\"valid\":");
-                builder.append("true");
-            }
-            if (m.getValue().length() != 0) {
-//                this.jsonGenerator.writeStringField("value", m.getValue());
-                builder.append(",");
-                builder.append("\"value\":");
-                builder.append("\"");
-                builder.append(escapeJsonString(m.getValue()));
-                builder.append("\"");
-            }
-
-            // ### check for children
-            NodeList childBindings = bind.getElement().getElementsByTagName("xf-bind");
-            if(childBindings.getLength() > 1){
-                builder.append(",\"bind\":[");
-
-                for(int i=0;i<childBindings.getLength();i++){
-                    Bind b = (Bind) childBindings.item(i).getUserData("xf-bind");
-                    writeJson(b,builder,true);
-                    if(i<childBindings.getLength()){
-                        builder.append(",");
-                    }
-                }
-
-                builder.append("]");
-            }else if(childBindings.getLength() == 1){
-                Bind b = (Bind) childBindings.item(0).getUserData("xf-bind");
-                writeJson(b,builder,false);
-            }
-
-            if(isArray){
-                builder.append("}");
-            }else{
-                builder.append("}}");
-            }
-
-
-        } else if (bind.getElement().hasAttribute("set")) {
-            // ##### set binding #####
-
-        } else {
-            throw new XFormsException("Bind has no binding expression - one of 'ref' or 'bind' are necessary");
-        }
-
-
-    }
-
     /**
      * 7.3.5 The refresh() Method
      * <p/>
@@ -557,6 +253,8 @@ public class Model {
      * method takes no parameters and raises no exceptions.
      */
     public void refresh() throws XFormsException, IOException {
+        this.updates = ""; //clear
+
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug(" #################### START REFRESH Model ####################");
             LOGGER.debug(this);
@@ -567,7 +265,7 @@ public class Model {
 
 
 //        NodeList nl = this.element.getElementsByTagName("xf-bind");
-        List list = DOMUtil.getChildElements(this.element);
+        List list = DOMUtil.getChildElementsByTagName(this.element,"xf-bind");
 
 
 //        this.jsonGenerator.writeStartArray();// outer array
@@ -586,13 +284,20 @@ public class Model {
 
                 String bindId = e.getAttribute("id");
                 Bind b = (Bind) e.getUserData("xf-bind");
-                Node n = (Node) ((DOMNodeWrapper) b.getNodeset().get(0)).getUnderlyingNode();
-                ModelItem m = (ModelItem) n.getUserData("modelItem");
 
-                writeJson(b, sb,false);
-                if (i < list.size()) {
-                    sb.append(",");
+                if(b.getNodeset().size() != 0){
+                    Node n = (Node) ((DOMNodeWrapper) b.getNodeset().get(0)).getUnderlyingNode();
+//                    ModelItem m = (ModelItem) n.getUserData("modelItem");
+
+                    writeJson(b, sb,false,0, false);
+                    if (i < (list.size()-1)) {
+                        sb.append(",");
+                    }
+                }else{
+                    // it's an error if there's nothing bound
+                    throw new XFormsException("bind '" + b.getId() + "' does not refer to anything. Wrong binding expression: '" + b.getBindingExpression() + "'");
                 }
+
 
 //                writeBinding(b);
 //                JsonObject jo = writeBindObject(b);
@@ -603,55 +308,190 @@ public class Model {
 
         sb.append("]");//outer array end
 
-
-//        System.out.println(ja.build().toString());
-        System.out.println(sb.toString());
-
-//        StringWriter writer = new StringWriter();
-//        JsonWriter jwriter = Json.createWriter(writer);
-//        writer.write(ja.build());
-
-
-//        this.jsonGenerator.writeEndArray();// end outer array
-
-//        this.jsonGenerator.close();
-//        String result = this.jsonWriter.toString();
-//        System.out.println(result);
-
-
-
-/*
-        if (this.instances != null) {
-            Instance instance;
-            Iterator iterator;
-            ModelItem modelItem;
-            for (int index = 0; index < this.instances.size(); index++) {
-                instance = (Instance) this.instances.get(index);
-
-                // resets state keeping on model items
-                iterator = instance.iterateModelItems();
-                while (iterator.hasNext()) {
-                    modelItem = (ModelItem) iterator.next();
-                    modelItem.getStateChangeView().reset();
-                }
-            }
-        }
-
-        //reset refreshItems
-        for (int index = 0; index < this.refreshedItems.size(); index++) {
-            RefreshView refreshView = (RefreshView) this.refreshedItems.get(index);
-            refreshView.reset();
-        }
-        this.refreshedItems.clear();
-*/
+//        System.out.println(sb.toString());
 
 //        this.updateSequencer.perform();
 
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug(this + " #################### END REFRESH Model ####################");
         }
+
+        this.updates = sb.toString();
     }
 
+    private String escapeJsonString(String raw) {
+        String escaped = raw;
+        escaped = escaped.replace("\\", "\\\\");
+        escaped = escaped.replace("\"", "\\\"");
+        escaped = escaped.replace("\b", "\\b");
+        escaped = escaped.replace("\f", "\\f");
+        escaped = escaped.replace("\n", "\\n");
+        escaped = escaped.replace("\r", "\\r");
+        escaped = escaped.replace("\t", "\\t");
+        // TODO: escape other non-printing characters using uXXXX notation
+        return escaped;
+    }
+
+    private void writeJson(Bind bind, StringBuilder builder,boolean isArray, int index, boolean repeated) throws XFormsException {
+
+        if (bind.getElement().hasAttribute("ref")) {
+
+            if(isArray){
+                builder.append("{");
+            }else{
+                builder.append("{\"bind\":{");
+            }
+            builder.append("\"id\":\"");
+            builder.append(bind.getId());
+            builder.append("\"");
+
+            ModelItem m = null;
+            if(repeated){
+                m = bind.getModelItems().get(index); //there can be just one for a single node bind
+            }else{
+                m = bind.getModelItems().get(0); //there can be just one for a single node bind
+            }
+            RefreshView rv = m.getRefreshView();
+
+            if (rv.isEnabledMarked()) {
+                builder.append(",");
+                builder.append("\"relevant\":");
+                builder.append("true");
+            }
+            if (rv.isDisabledMarked()) {
+                builder.append(",");
+                builder.append("\"relevant\":");
+                builder.append("false");
+            }
+            if (rv.isReadwriteMarked()) {
+                builder.append(",");
+                builder.append("\"readonly\":");
+                builder.append("false");
+            }
+            if (rv.isReadonlyMarked()) {
+                builder.append(",");
+                builder.append("\"readonly\":");
+                builder.append("true");
+            }
+            if (rv.isOptionalMarked()) {
+                builder.append(",");
+                builder.append("\"required\":");
+                builder.append("false");
+            }
+            if (rv.isRequiredMarked()) {
+                builder.append(",");
+                builder.append("\"required\":");
+                builder.append("true");
+            }
+            if (rv.isInvalidMarked()) {
+                builder.append(",");
+                builder.append("\"valid\":");
+                builder.append("false");
+            }
+
+            if (rv.isValidMarked()) {
+                builder.append(",");
+                builder.append("\"valid\":");
+                builder.append("true");
+            }
+            if (m.getValue().length() != 0 && DOMUtil.getChildElement(bind.getElement(),"xf-bind") == null)  {
+
+//                this.jsonGenerator.writeStringField("value", m.getValue());
+                builder.append(",");
+                builder.append("\"value\":");
+                builder.append("\"");
+                builder.append(escapeJsonString(m.getValue()));
+                builder.append("\"");
+            }
+            processChildBindings(bind, builder);
+
+            if(isArray){
+                builder.append("}");
+            }else{
+                builder.append("}}");
+            }
+
+
+        } else if (bind.getElement().hasAttribute("set")) {
+            // ##### set binding #####
+
+            builder.append("\"id\":\"");
+            builder.append(bind.getId());
+            builder.append("\"");
+            builder.append(",");
+            builder.append("\"sequence\": true");
+            builder.append(",");
+            builder.append("\"bind\": [");
+
+            List modelItems = bind.getModelItems();
+            for (int i = 0; i < modelItems.size(); i++) {
+                ModelItem m  = (ModelItem) modelItems.get(i);
+
+                builder.append("["); // inner array of repeat (repeatitem)
+
+                List childBindings = DOMUtil.getChildElementsByTagName(bind.getElement(),"xf-bind");
+                for(int j=0;j<childBindings.size();j++){
+                    Node n = (Node) childBindings.get(j);
+
+                    Bind b = (Bind) n.getUserData("xf-bind");
+                    writeJson(b,builder,true,i, true);
+                    if(j < (childBindings.size()-1)){
+                        builder.append(",");
+                    }
+                }
+
+
+                builder.append("]"); // end repeat-item
+
+                if(i< (modelItems.size()-1)){
+                    builder.append(",");
+                }
+
+
+            }
+
+
+
+            builder.append("]");
+
+        } else {
+            throw new XFormsException("Bind has no binding expression - one of 'ref' or 'bind' are necessary");
+        }
+
+
+    }
+
+    private void processChildBindings(Bind bind, StringBuilder builder) throws XFormsException {
+        // ### check for children
+        List childBindings = DOMUtil.getChildElementsByTagName(bind.getElement(),"xf-bind");
+        if(childBindings.size() > 1){
+            builder.append(",\"bind\":[");
+
+            for(int i=0;i<childBindings.size();i++){
+                Node n = (Node) childBindings.get(i);
+
+                Bind b = (Bind) n.getUserData("xf-bind");
+                writeJson(b,builder,true,i, false);
+                if(i < (childBindings.size()-1)){
+                    builder.append(",");
+                }
+            }
+
+            builder.append("]");
+        }else if(childBindings.size() == 1){
+            builder.append(",\"bind\":{");
+
+            Node n = (Node) childBindings.get(0);
+            Bind b = (Bind) n.getUserData("xf-bind");
+            writeJson(b,builder,false,0, false);
+            builder.append("}");
+        }
+    }
+
+
+    public String getUpdates(){
+        return this.updates;
+    }
 
     /**
      * returns the default instance of this model. this is always the first in
@@ -762,7 +602,8 @@ public class Model {
 
     public Bind getBind(String id) {
         Document doc = this.element.getOwnerDocument();
-        Element e = doc.getElementById(id);
+        //slightly more inefficient than getElementById but avoids declaring 'id' type
+        Element e = DOMUtil.getElementByAttributeValue(this.element,"xf-bind","id", id);
         Bind b = (Bind) e.getUserData("xf-bind");
         return b;
     }
@@ -794,14 +635,6 @@ public class Model {
             }
         }
         return result;
-    }
-
-    private void createInstanceObject(Element xformsInstance) throws XFormsException {
-//        Instance instance = (Instance) this.container.getElementFactory().createXFormsElement(xformsInstance, this);
-
-        Instance instance = new Instance(xformsInstance, this);
-        instance.init();
-        this.instances.add(instance);
     }
 
 

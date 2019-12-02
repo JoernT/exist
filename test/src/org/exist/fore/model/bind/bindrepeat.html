@@ -23,14 +23,16 @@
         <data>
             <operator>AND</operator>
             <dialects>
-                <dialect not="false">foo</dialect>
+                <dialect not="true">foo</dialect>
                 <dialect not="false">bar</dialect>
+                <dialect not="false">baz</dialect>
             </dialects>
         </data>
     </xf-instance>
     <xf-bind id="b-op" ref="operator"></xf-bind>
-    <xf-bind id="b-dialects" set="dialects">
-        <xf-bind id="b-dialect" ref="dialect">
+    <xf-bind id="b-dialects" ref="dialects">
+        <xf-bind id="b-dialect" set="dialect">
+            <xf-bind id="b-dialect-text" ref="./text()"></xf-bind>
             <xf-bind id="b-not" ref="@not"></xf-bind>
         </xf-bind>
     </xf-bind>

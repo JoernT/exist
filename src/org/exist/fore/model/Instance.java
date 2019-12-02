@@ -47,6 +47,30 @@ public class Instance {
         this.model = model;
     }
 
+    /**
+     * Performs element init.
+     *
+     */
+    public void init() throws XFormsException {
+        if (LOGGER.isTraceEnabled()) {
+            LOGGER.trace(this + " init");
+        }
+
+        // load initial instance
+        this.initialInstance = createInitialInstance();
+        // create instance document
+        this.instanceDocument = createInstanceDocument();
+
+        if(this.element.getAttribute("id").equals("")){
+            this.element.setAttribute("id","default");
+        }
+
+        storeUserObjects();
+
+//        initXPathContext();
+    }
+
+
     public static ModelItem createModelItem(Node node) {
         String id = Model.generateModelItemId();
         ModelItem modelItem;
@@ -80,29 +104,6 @@ public class Instance {
 
     // lifecycle methods
 
-    /**
-     * Performs element init.
-     *
-     */
-    public void init() throws XFormsException {
-        if (LOGGER.isTraceEnabled()) {
-            LOGGER.trace(this + " init");
-        }
-
-        // load initial instance
-        this.initialInstance = createInitialInstance();
-        // create instance document
-        this.instanceDocument = createInstanceDocument();
-
-        if(this.element.getAttribute("id").equals("")){
-            this.element.setAttribute("id","default");
-        }
-
-        DOMUtil.prettyPrintDOM(this.element);
-        storeUserObjects();
-
-//        initXPathContext();
-    }
 
     private void storeUserObjects() {
         if(instanceDocument.getDocumentElement() != null){
@@ -128,12 +129,19 @@ public class Instance {
         return this.instanceDocument;
     }
 
-/*
+    /**
+     * returns the initial instance
+     * @return the initial instance
+     */
     public Document getInitialInstance(){
-        return this.initialInstance;
+        if(this.initialInstance != null){
+            Document doc =DOMUtil.newDocument(true,false);
+            doc.appendChild(doc.importNode(this.initialInstance,true));
+            return doc;
+        }else{
+            return null;
+        }
     }
-*/
-
     /**
      * Returns a new created instance document.
      * <p/>

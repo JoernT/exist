@@ -33,7 +33,7 @@ public class XFormsElementTest extends TestCase {
 
     @Before
     public void setUp() throws Exception {
-        String path = getClass().getResource("simple.html").getPath();
+        String path = getClass().getResource("model/simple.html").getPath();
         String fileURI = "file://" + path.substring(0, path.lastIndexOf("simple.html"));
 
         doc = DOMUtil.parseXmlFile(path,true,false);
@@ -44,6 +44,6 @@ public class XFormsElementTest extends TestCase {
     }
 
     @Test
-    public void init() {
+    public void testInit() {
     }
 }

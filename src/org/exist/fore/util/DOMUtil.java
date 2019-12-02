@@ -167,6 +167,26 @@ public class DOMUtil {
     }
 
     /**
+     * returns a java.util.List of Elements which are children of the start Element.
+     */
+    public static List getChildElementsByTagName(Node start, String tagName) {
+        List l = new ArrayList();
+        NodeList nl = start.getChildNodes();
+        int len = nl.getLength();
+        Node n = null;
+
+        for (int i = 0; i < len; i++) {
+            n = nl.item(i);
+
+            if (n.getNodeType() == Node.ELEMENT_NODE && n.getNodeName().equalsIgnoreCase(tagName)) {
+                l.add(n);
+            }
+        }
+
+        return l;
+    }
+
+    /**
      * returns an element's position in the given NodeList
      *
      * @param refNode the element to get the index for
